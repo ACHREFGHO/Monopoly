@@ -18,7 +18,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 
-import { Car, Zap, Droplets, Train, AlertTriangle, Play, Lock, Siren, Send } from 'lucide-react';
+import { Car, Zap, Droplets, Plane, AlertTriangle, Play, Lock, Siren, Send } from 'lucide-react';
 
 const Token3D = ({ color, shape }: { color: string, shape?: string }) => {
     const meshRef = React.useRef<THREE.Group>(null);
@@ -431,103 +431,107 @@ export const Board = () => {
                 <div className="w-full h-full max-w-[92vh] max-h-[92vh] aspect-square relative transition-transform duration-500 z-10" style={{ perspective: "2000px" }}>
                     {/* The Game Board */}
                     <div
-                        className="grid gap-[2px] sm:gap-[4px] p-1 sm:p-1.5 bg-[#050308] rounded-2xl relative w-full h-full border-[1px] border-white/5 shadow-[0_40px_100px_rgba(0,0,0,0.9)]"
+                        className="grid gap-1 sm:gap-1.5 p-1 sm:p-2 bg-[#050308] rounded-2xl relative w-full h-full border-[1px] border-white/5 shadow-[0_40px_100px_rgba(0,0,0,0.9)]"
                         style={{
-                            gridTemplateRows: "1.25fr repeat(9, 1fr) 1.25fr",
-                            gridTemplateColumns: "1.25fr repeat(9, 1fr) 1.25fr",
+                            gridTemplateRows: "1.2fr repeat(9, 1fr) 1.2fr",
+                            gridTemplateColumns: "1.2fr repeat(9, 1fr) 1.2fr",
                         }}
                     >
                         {BOARD_SPACES.map((space) => {
-                            const { gridRow, gridColumn } = getGridArea(space.id);
-                            const bState = boardState[space.id];
-                            const isCorner = space.id % 10 === 0;
+                            const id = space.id;
+                            const { gridRow, gridColumn } = getGridArea(id);
+                            const bState = boardState[id];
+                            const isCorner = id % 10 === 0;
 
-                            let edge = 'top';
-                            if (space.id > 10 && space.id < 20) edge = 'right';
-                            if (space.id > 20 && space.id < 30) edge = 'bottom';
-                            if (space.id > 30 && space.id < 40) edge = 'left';
+                            // Determine orientation relative to board center
+                            let edge: 'top' | 'bottom' | 'left' | 'right' = 'top';
+                            if (id > 10 && id < 20) edge = 'right';
+                            else if (id > 20 && id < 30) edge = 'bottom';
+                            else if (id > 30 && id < 40) edge = 'left';
 
+                            // Perimeter logic: components always sit at the board's outer boundary
                             return (
-                                <div
-                                    key={space.id}
-                                    onMouseEnter={() => setHoveredSpaceId(space.id)}
+                                <motion.div
+                                    key={id}
+                                    onMouseEnter={() => setHoveredSpaceId(id)}
                                     onMouseLeave={() => setHoveredSpaceId(null)}
-                                    className={`relative flex flex-col items-center justify-center bg-[#171421] rounded-lg overflow-hidden transition-all duration-300 border border-white/10 group/space ${isCorner ? 'p-1 sm:p-2' : ''} shadow-[0_4px_0_0_rgba(0,0,0,0.4)] hover:shadow-none hover:translate-y-[2px] cursor-pointer`}
+                                    whileHover={{
+                                        scale: 1.05,
+                                        zIndex: 40,
+                                        boxShadow: "0 20px 40px rgba(0,0,0,0.5)"
+                                    }}
+                                    className="relative flex flex-col items-center justify-center bg-[#1E1B2E] rounded-2xl overflow-hidden transition-all duration-300 border border-white/5 group/space shadow-xl cursor-pointer"
                                     style={{ gridRow, gridColumn }}
                                 >
-                                    {/* Glass Reflection Top */}
-                                    <div className="absolute inset-x-0 top-0 h-[10%] bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
-                                    {/* Color header for properties with gradient */}
+                                    {/* Property Color Header - Always at Perimeter */}
                                     {space.type === 'property' && space.color && (
                                         <div
-                                            className="absolute z-0 shadow-inner"
+                                            className="absolute z-0 shadow-sm"
                                             style={{
-                                                ... (edge === 'bottom' ? { top: 0, left: 0, right: 0, height: '26%' } : {}),
-                                                ... (edge === 'left' ? { top: 0, right: 0, bottom: 0, width: '26%' } : {}),
-                                                ... (edge === 'top' ? { bottom: 0, left: 0, right: 0, height: '26%' } : {}),
-                                                ... (edge === 'right' ? { top: 0, left: 0, bottom: 0, width: '26%' } : {}),
-                                                background: `linear-gradient(to ${edge === 'top' ? 'top' : edge === 'bottom' ? 'bottom' : edge === 'left' ? 'left' : 'right'}, ${space.color}, ${space.color}cc)`,
-                                                borderBottom: edge === 'bottom' ? '2px solid rgba(255,255,255,0.2)' : 'none',
-                                                borderTop: edge === 'top' ? '2px solid rgba(255,255,255,0.2)' : 'none',
-                                                borderLeft: edge === 'left' ? '2px solid rgba(255,255,255,0.2)' : 'none',
-                                                borderRight: edge === 'right' ? '2px solid rgba(255,255,255,0.2)' : 'none',
+                                                ... (edge === 'top' ? { top: 0, left: 0, right: 0, height: '18px' } : {}),
+                                                ... (edge === 'bottom' ? { bottom: 0, left: 0, right: 0, height: '18px' } : {}),
+                                                ... (edge === 'left' ? { left: 0, top: 0, bottom: 0, width: '18px' } : {}),
+                                                ... (edge === 'right' ? { right: 0, top: 0, bottom: 0, width: '18px' } : {}),
+                                                background: space.color,
                                             }}
                                         />
                                     )}
 
-                                    {/* Inner Content Wrapper */}
-                                    <div
-                                        className={`flex flex-col items-center justify-between w-full h-full p-0.5 sm:p-1 text-center absolute inset-0 z-10 
-                                        ${!isCorner && space.type === 'property' && edge === 'bottom' ? 'pt-[28%]' :
-                                                !isCorner && space.type === 'property' && edge === 'top' ? 'pb-[28%]' :
-                                                    !isCorner && space.type === 'property' && edge === 'left' ? 'pr-[28%]' :
-                                                        !isCorner && space.type === 'property' && edge === 'right' ? 'pl-[28%]' : ''}`}
-                                    >
-                                        <div className="flex-1 flex flex-col items-center justify-center w-full mt-0.5">
-                                            {isCorner && space.id === 0 && <Play size={20} className="text-[#CBB26A] mb-1 sm:mb-2" />}
-                                            {isCorner && space.id === 10 && <Lock size={16} className="text-rose-500 mb-1 sm:mb-2" />}
-                                            {isCorner && space.id === 20 && <Car size={20} className="text-sky-400 mb-1 sm:mb-2" />}
-                                            {isCorner && space.id === 30 && <Siren size={20} className="text-amber-500 mb-1 sm:mb-2" />}
-                                            {!isCorner && space.type === 'station' && <Train size={12} className="text-slate-400 mb-0.5" />}
-                                            {!isCorner && space.type === 'utility' && space.id === 12 && <Zap size={12} className="text-yellow-400 mb-0.5" />}
-                                            {!isCorner && space.type === 'utility' && space.id === 28 && <Droplets size={12} className="text-blue-400 mb-0.5" />}
-                                            {!isCorner && space.type === 'tax' && <AlertTriangle size={12} className="text-[#CBB26A] mb-0.5" />}
-
-                                            <span className={`font-black text-white leading-[1.1] flex flex-col items-center justify-center w-full px-0.5 
-                                                ${isCorner ? 'text-[10px] sm:text-[12px] md:text-[14px] uppercase tracking-tighter' : 'text-[8px] sm:text-[10px] md:text-[11px]'} drop-shadow-lg`}
-                                                style={{
-                                                    wordBreak: 'normal',
-                                                    overflowWrap: 'break-word',
-                                                    textShadow: '0 2px 8px rgba(0,0,0,0.9)',
-                                                    letterSpacing: isCorner ? '0' : '-0.02em'
-                                                }}>
-                                                {space.name}
+                                    {/* Price Badge - Flush tab on Perimeter */}
+                                    {(space.price || space.type === 'tax') && (
+                                        <div
+                                            className="absolute z-30 bg-white rounded shadow-lg px-2 py-0.5 border border-gray-100"
+                                            style={{
+                                                ... (edge === 'top' ? { top: '6px', left: '50%', transform: 'translateX(-50%)' } : {}),
+                                                ... (edge === 'bottom' ? { bottom: '6px', left: '50%', transform: 'translateX(-50%)' } : {}),
+                                                ... (edge === 'left' ? { left: '6px', top: '50%', transform: 'translateX(-50%)' } : {}),
+                                                ... (edge === 'right' ? { right: '6px', top: '50%', transform: 'translateX(-50%)' } : {}),
+                                            }}
+                                        >
+                                            <span className="font-mono font-black text-[#1E1B2E] text-[10px] leading-none whitespace-nowrap">
+                                                {space.type === 'tax' ? (id === 4 ? '10%' : `${space.price}$`) : `${space.price}$`}
                                             </span>
                                         </div>
+                                    )}
 
+                                    {/* Inner Content - Buffered by perimeter edge */}
+                                    <div
+                                        className={`flex flex-col items-center justify-center w-full h-full relative z-10
+                                        ${edge === 'top' ? 'pt-8 pb-1' : edge === 'bottom' ? 'pb-8 pt-1' :
+                                                edge === 'left' ? 'pl-8 pr-1' : 'pr-8 pl-1'}`}
+                                    >
+                                        <div className="flex flex-col items-center justify-center w-full">
+                                            {isCorner && id === 0 && <div className="text-xl sm:text-2xl mb-1">🚩</div>}
+                                            {isCorner && id === 10 && <Lock size={22} className="text-rose-500 mb-1" />}
+                                            {isCorner && id === 20 && <div className="text-xl sm:text-2xl mb-1">🌴</div>}
+                                            {isCorner && id === 30 && <Siren size={22} className="text-amber-500 mb-1" />}
+                                            {!isCorner && space.type === 'station' && <Plane size={18} className="text-white mb-1" />}
+                                            {!isCorner && space.type === 'utility' && id === 12 && <Zap size={18} className="text-yellow-400 mb-1" fill="currentColor" fillOpacity={0.2} />}
+                                            {!isCorner && space.type === 'utility' && id === 28 && <Droplets size={18} className="text-blue-400 mb-1" fill="currentColor" fillOpacity={0.2} />}
+                                            {!isCorner && space.type === 'tax' && <div className="text-xl mb-1">💸</div>}
+                                            {space.type === 'chance' && <div className="text-3xl font-black text-rose-500 mb-1">?</div>}
+                                            {space.type === 'chest' && <div className="text-3xl mb-1">🎁</div>}
 
-                                        {space.price && (
-                                            <span className="font-mono font-black text-white pb-0.5 text-[8px] sm:text-[10px] md:text-[11px] px-1.5 py-0.5 rounded shadow-lg" style={{ background: 'rgba(0,0,0,0.5)', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                                                {space.price}$
+                                            <span className={`font-black text-white leading-tight text-center w-full px-1
+                                                ${isCorner ? 'text-[10px] sm:text-[11px] md:text-[12px] uppercase' : 'text-[8.5px] sm:text-[9.5px]'}
+                                                max-w-full whitespace-pre-wrap break-words`}
+                                                style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
+                                            >
+                                                {isCorner ? space.name.split(' ').join('\n') : space.name}
                                             </span>
-                                        )}
-                                        {space.type === 'tax' && (
-                                            <span className="font-mono font-black text-[#CBB26A] pb-1 text-[8px] sm:text-[10px] md:text-[11px] uppercase tracking-widest leading-none px-1.5 py-0.5 rounded shadow-lg" style={{ background: 'rgba(0,0,0,0.5)' }}>
-                                                {space.id === 4 ? "10% FEE" : `${space.price}$ FEE`}
-                                            </span>
-                                        )}
+                                        </div>
                                     </div>
 
-                                    {/* Ownership markers */}
+                                    {/* Ownership marker */}
                                     {bState?.ownerId && (
-                                        <div className="absolute top-0 right-0 w-full h-full border-[2px] sm:border-[3px] rounded-md sm:rounded-lg opacity-80 pointer-events-none" style={{ borderColor: players.find(p => p.id === bState.ownerId)?.color || 'white' }} />
+                                        <div className="absolute inset-0 border-[3px] rounded-2xl opacity-80 pointer-events-none z-20" style={{ borderColor: players.find(p => p.id === bState.ownerId)?.color || 'white' }} />
                                     )}
-                                </div>
+                                </motion.div>
                             );
                         })}
 
                         {/* Tokens layer over the board grid */}
-                        <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateRows: '1.25fr repeat(9, 1fr) 1.25fr', gridTemplateColumns: '1.25fr repeat(9, 1fr) 1.25fr', gap: '4px', padding: '8px' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateRows: '1.2fr repeat(9, 1fr) 1.2fr', gridTemplateColumns: '1.2fr repeat(9, 1fr) 1.2fr', gap: '6px', padding: '8px' }}>
                             <AnimatePresence>
                                 {players.map((player) => {
                                     const { gridRow, gridColumn } = getGridArea(player.position);
@@ -589,10 +593,10 @@ export const Board = () => {
                             <AnimatePresence>
                                 {hoveredSpaceId !== null && (
                                     <motion.div
-                                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                                        className="absolute z-50 bg-[#0A0810]/95 backdrop-blur-xl border border-white/10 p-6 rounded-3xl shadow-[0_30px_60px_rgba(0,0,0,0.8)] w-60 flex flex-col items-center text-center -translate-y-8"
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.8 }}
+                                        className="absolute z-[100] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#0A0810]/98 backdrop-blur-3xl border border-[#CBB26A]/30 p-8 rounded-[2.5rem] shadow-[0_50px_100px_rgba(0,0,0,0.9)] w-72 flex flex-col items-center text-center"
                                     >
                                         {BOARD_SPACES[hoveredSpaceId].color && (
                                             <div className="w-full h-10 rounded-2xl mb-4 shadow-lg" style={{ backgroundColor: BOARD_SPACES[hoveredSpaceId].color, background: `linear-gradient(to bottom, ${BOARD_SPACES[hoveredSpaceId].color}, ${BOARD_SPACES[hoveredSpaceId].color}cc)` }} />
@@ -654,17 +658,13 @@ export const Board = () => {
                                     </motion.div>
                                 )}
                             </AnimatePresence>
-                            {/* LUXURY CENTER LOGO */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none select-none">
-                                <div className="text-[6vw] font-black tracking-tighter text-white rotate-[-45deg] blur-[3px]">OPOLY</div>
-                            </div>
 
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="absolute flex flex-col items-center justify-center top-[12%]">
 
-                                <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white tracking-[0.2em] drop-shadow-[0_10px_30px_rgba(0,0,0,1)] flex items-center">
-                                    <span className="opacity-20">M</span>EDITERRAN<span className="text-[#CBB26A] drop-shadow-[0_0_20px_rgba(203,178,106,0.3)]">OPOLY</span>
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="absolute flex flex-col items-center justify-center top-[10%] inset-x-0 mx-auto">
+                                <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-[0.1em] drop-shadow-[0_10px_30px_rgba(0,0,0,1)] bg-gradient-to-b from-white via-[#CBB26A] to-[#8E793E] bg-clip-text text-transparent flex items-center">
+                                    MEDITERRANOPOLY
                                 </h1>
-                                <div className="w-24 h-[1px] bg-gradient-to-r from-transparent via-[#CBB26A]/30 to-transparent mt-3" />
+                                <div className="w-48 h-[1px] bg-gradient-to-r from-transparent via-[#CBB26A]/40 to-transparent mt-4 shadow-[0_0_15px_rgba(203,178,106,0.5)]" />
                             </motion.div>
                             {/* Animated Dice Engine in 3D */}
                             <div className="absolute inset-x-0 top-[28%] flex gap-4 md:gap-8 h-16 sm:h-24 md:h-32 items-center justify-center p-2">
@@ -714,9 +714,10 @@ export const Board = () => {
                                     <button
                                         onClick={handleRollClick}
                                         disabled={!canRoll}
-                                        className={`flex-1 max-w-[170px] py-4 rounded-full font-black text-[10px] sm:text-xs tracking-[0.3em] bg-[#CBB26A] text-[#0A0810] hover:bg-[#DBC27A] hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(203,178,106,0.2)] flex items-center justify-center gap-3 group ${!canRoll ? 'opacity-0 scale-90 pointer-events-none' : 'scale-100'}`}
+                                        className={`flex-1 max-w-[190px] py-4 rounded-full font-black text-xs tracking-[0.3em] bg-gradient-to-br from-[#CBB26A] via-[#DBC27A] to-[#8E793E] text-[#0A0810] hover:scale-110 active:scale-95 transition-all shadow-[0_15px_40px_rgba(203,178,106,0.4)] flex items-center justify-center gap-3 group relative overflow-hidden ${!canRoll ? 'opacity-0 scale-90 pointer-events-none' : 'scale-100 animate-pulse'}`}
                                     >
-                                        ROLL <div className="w-4 h-4 bg-[#0A0810]/20 rounded-md flex items-center justify-center text-[8px] group-hover:rotate-45 transition-transform">🎲</div>
+                                        <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12" />
+                                        ROLL <div className="w-5 h-5 bg-[#0A0810]/20 rounded-lg flex items-center justify-center text-[10px] group-hover:rotate-[360deg] transition-transform duration-700">🎲</div>
                                     </button>
                                     <button
                                         onClick={() => { if (canEndTurn) endTurn() }}
@@ -732,10 +733,10 @@ export const Board = () => {
                             <AnimatePresence>
                                 {activeModalSpaceId !== null && (
                                     <motion.div
-                                        initial={{ opacity: 0, scale: 0.8, y: 30 }}
-                                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.8, y: 30 }}
-                                        className="absolute z-[100] bg-[#111827]/95 backdrop-blur-2xl border border-[#CBB26A]/30 p-8 rounded-[2.5rem] shadow-[0_50px_100px_rgba(0,0,0,0.9)] w-80 pointer-events-auto flex flex-col items-center"
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.8 }}
+                                        className="absolute z-[100] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#111827]/96 backdrop-blur-3xl border border-[#CBB26A]/30 p-8 rounded-[2.5rem] shadow-[0_50px_100px_rgba(0,0,0,0.9)] w-80 pointer-events-auto flex flex-col items-center"
                                     >
                                         <button
                                             onClick={() => setActiveModalSpaceId(null)}
@@ -771,21 +772,27 @@ export const Board = () => {
 
                                 {activeCard && (
                                     <motion.div
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -20 }}
-                                        className={`absolute z-[110] pointer-events-auto p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border overflow-hidden ${activeCard.type === 'chance' ? 'bg-[#2A1D11] border-[#EAB308]' : 'bg-[#112030] border-[#38BDF8]'}`}
+                                        initial={{ opacity: 0, scale: 0.8, y: 50, rotateX: 45 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
+                                        exit={{ opacity: 0, scale: 0.8, y: -50, rotateX: -45 }}
+                                        className={`absolute z-[110] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto p-10 rounded-[2.5rem] shadow-[0_60px_100px_rgba(0,0,0,0.9)] w-80 text-center border-2 overflow-hidden flex flex-col items-center ${activeCard.type === 'chance' ? 'bg-[#2A1D11]/95 border-[#EAB308]/50 shadow-[0_0_50px_rgba(234,179,8,0.2)]' : 'bg-[#112030]/95 border-[#38BDF8]/50 shadow-[0_0_50px_rgba(56,189,248,0.2)]'} backdrop-blur-2xl`}
                                     >
-                                        <h3 className={`text-xl font-black uppercase tracking-widest mb-2 ${activeCard.type === 'chance' ? 'text-[#EAB308]' : 'text-[#38BDF8]'}`}>
-                                            {activeCard.type === 'chance' ? 'Surprise' : 'Treasure'}
+                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-2xl ${activeCard.type === 'chance' ? 'bg-[#EAB308] shadow-[#EAB308]/30' : 'bg-[#38BDF8] shadow-[#38BDF8]/30'}`}>
+                                            <span className="text-3xl font-black text-black">{activeCard.type === 'chance' ? '?' : '$'}</span>
+                                        </div>
+
+                                        <h3 className={`text-xs font-black uppercase tracking-[0.5em] mb-4 ${activeCard.type === 'chance' ? 'text-[#EAB308]' : 'text-[#38BDF8]'}`}>
+                                            {activeCard.type === 'chance' ? 'Surprise Event' : 'Treasury Chest'}
                                         </h3>
-                                        <p className="text-2xl font-bold text-white mb-2">{activeCard.title}</p>
-                                        <p className="text-slate-300 font-medium mb-6">{activeCard.description}</p>
+
+                                        <h2 className="text-2xl font-black text-white mb-2 leading-tight tracking-tight">{activeCard.title}</h2>
+                                        <p className="text-slate-400 font-bold text-sm mb-10 px-4 leading-relaxed italic border-t border-white/5 pt-4">"{activeCard.description}"</p>
+
                                         <button
                                             onClick={() => useGameStore.getState().dismissCard()}
-                                            className="px-6 py-2 rounded-lg font-bold bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                            className={`w-full py-4 rounded-2xl font-black text-sm tracking-[0.2em] transition-all hover:scale-105 active:scale-95 shadow-xl ${activeCard.type === 'chance' ? 'bg-[#EAB308] text-[#0A0810] hover:bg-[#FACC15]' : 'bg-[#38BDF8] text-[#0A0810] hover:bg-[#7DD3FC]'}`}
                                         >
-                                            Got it
+                                            ACKNOWLEDGE
                                         </button>
                                     </motion.div>
                                 )}
@@ -1025,6 +1032,6 @@ export const Board = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </div >
     );
 };
