@@ -193,8 +193,9 @@ const Dice3D = ({ value, rolling }: { value: number, rolling: boolean }) => {
 };
 
 export const Board = () => {
-    const { players, currentTurn, boardState, rollDice, endTurn, diceRoll, activeCard, activeTrade, hasRolled, respondToTrade, proposeTrade, chatMessages, sendMessage } = useGameStore();
+    const { players, currentTurn, boardState, rollDice, endTurn, diceRoll, activeCard, activeTrade, hasRolled, respondToTrade, proposeTrade, chatMessages, sendMessage, activeModalSpaceId, setActiveModalSpaceId, buyProperty, isMoving } = useGameStore();
     const [isRolling, setIsRolling] = useState(false);
+    const [hoveredSpaceId, setHoveredSpaceId] = useState<number | null>(null);
     const [chatInput, setChatInput] = useState('');
     const chatEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -267,8 +268,8 @@ export const Board = () => {
         setTempPlayers(tempPlayers.filter(p => p.id !== id));
     };
 
-    const canRoll = !hasRolled;
-    const canEndTurn = hasRolled;
+    const canRoll = !hasRolled && !isMoving;
+    const canEndTurn = hasRolled && !isMoving;
 
     const handleRollClick = () => {
         if (!canRoll) return;
@@ -423,15 +424,17 @@ export const Board = () => {
                 )}
             </div>
 
-            <div className="flex-1 relative flex items-center justify-center p-2 sm:p-4 lg:p-8 overflow-hidden bg-[#0E0B16]">
+            <div className="flex-1 relative flex items-center justify-center p-1 sm:p-2 lg:p-4 overflow-hidden bg-[#0A0810]">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#1A1726_0%,_#0A0810_100%)] opacity-50" />
+
                 {/* Fixed width container to keep board perfectly square natively */}
-                <div className="w-full h-full max-w-[85vh] max-h-[85vh] aspect-square relative transition-transform duration-500" style={{ perspective: "1500px" }}>
+                <div className="w-full h-full max-w-[92vh] max-h-[92vh] aspect-square relative transition-transform duration-500 z-10" style={{ perspective: "2000px" }}>
                     {/* The Game Board */}
                     <div
-                        className="grid gap-1 sm:gap-1.5 p-1 sm:p-2 bg-[#0E0B16] rounded-xl relative w-full h-full border-[2px] border-[#2A2438]/50 shadow-[0_0_50px_rgba(0,0,0,0.8)]"
+                        className="grid gap-[2px] sm:gap-[4px] p-1 sm:p-1.5 bg-[#050308] rounded-2xl relative w-full h-full border-[1px] border-white/5 shadow-[0_40px_100px_rgba(0,0,0,0.9)]"
                         style={{
-                            gridTemplateRows: "1.2fr repeat(9, 1fr) 1.2fr",
-                            gridTemplateColumns: "1.2fr repeat(9, 1fr) 1.2fr",
+                            gridTemplateRows: "1.25fr repeat(9, 1fr) 1.25fr",
+                            gridTemplateColumns: "1.25fr repeat(9, 1fr) 1.25fr",
                         }}
                     >
                         {BOARD_SPACES.map((space) => {
@@ -447,7 +450,9 @@ export const Board = () => {
                             return (
                                 <div
                                     key={space.id}
-                                    className={`relative flex flex-col items-center justify-center bg-[#171421] rounded-lg overflow-hidden transition-all duration-300 border border-white/10 group/space ${isCorner ? 'p-1 sm:p-2' : ''} shadow-[0_4px_0_0_rgba(0,0,0,0.4)] hover:shadow-none hover:translate-y-[2px]`}
+                                    onMouseEnter={() => setHoveredSpaceId(space.id)}
+                                    onMouseLeave={() => setHoveredSpaceId(null)}
+                                    className={`relative flex flex-col items-center justify-center bg-[#171421] rounded-lg overflow-hidden transition-all duration-300 border border-white/10 group/space ${isCorner ? 'p-1 sm:p-2' : ''} shadow-[0_4px_0_0_rgba(0,0,0,0.4)] hover:shadow-none hover:translate-y-[2px] cursor-pointer`}
                                     style={{ gridRow, gridColumn }}
                                 >
                                     {/* Glass Reflection Top */}
@@ -488,9 +493,14 @@ export const Board = () => {
                                             {!isCorner && space.type === 'utility' && space.id === 28 && <Droplets size={12} className="text-blue-400 mb-0.5" />}
                                             {!isCorner && space.type === 'tax' && <AlertTriangle size={12} className="text-[#CBB26A] mb-0.5" />}
 
-                                            <span className={`font-black tracking-normal text-white leading-tight flex flex-col items-center justify-center w-full px-1 
-                                                ${isCorner ? 'text-[11px] sm:text-[13px] md:text-[15px] uppercase' : 'text-[9px] sm:text-[11px] md:text-[12px]'} drop-shadow-lg`}
-                                                style={{ wordBreak: 'break-word', textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
+                                            <span className={`font-black text-white leading-[1.1] flex flex-col items-center justify-center w-full px-0.5 
+                                                ${isCorner ? 'text-[10px] sm:text-[12px] md:text-[14px] uppercase tracking-tighter' : 'text-[8px] sm:text-[10px] md:text-[11px]'} drop-shadow-lg`}
+                                                style={{
+                                                    wordBreak: 'normal',
+                                                    overflowWrap: 'break-word',
+                                                    textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+                                                    letterSpacing: isCorner ? '0' : '-0.02em'
+                                                }}>
                                                 {space.name}
                                             </span>
                                         </div>
@@ -517,7 +527,7 @@ export const Board = () => {
                         })}
 
                         {/* Tokens layer over the board grid */}
-                        <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateRows: '1.2fr repeat(9, 1fr) 1.2fr', gridTemplateColumns: '1.2fr repeat(9, 1fr) 1.2fr', gap: '4px', padding: '8px' }}>
+                        <div className="absolute inset-0 pointer-events-none" style={{ display: 'grid', gridTemplateRows: '1.25fr repeat(9, 1fr) 1.25fr', gridTemplateColumns: '1.25fr repeat(9, 1fr) 1.25fr', gap: '4px', padding: '8px' }}>
                             <AnimatePresence>
                                 {players.map((player) => {
                                     const { gridRow, gridColumn } = getGridArea(player.position);
@@ -572,23 +582,92 @@ export const Board = () => {
 
                         {/* Center Info Area */}
                         <div
-                            className="flex flex-col items-center justify-center p-4 sm:p-8 pointer-events-none relative"
+                            className="pointer-events-none relative w-full h-full"
                             style={{ gridRow: "2 / 11", gridColumn: "2 / 11" }}
                         >
+                            {/* HOVER INFO PANEL */}
+                            <AnimatePresence>
+                                {hoveredSpaceId !== null && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                                        className="absolute z-50 bg-[#0A0810]/95 backdrop-blur-xl border border-white/10 p-6 rounded-3xl shadow-[0_30px_60px_rgba(0,0,0,0.8)] w-60 flex flex-col items-center text-center -translate-y-8"
+                                    >
+                                        {BOARD_SPACES[hoveredSpaceId].color && (
+                                            <div className="w-full h-10 rounded-2xl mb-4 shadow-lg" style={{ backgroundColor: BOARD_SPACES[hoveredSpaceId].color, background: `linear-gradient(to bottom, ${BOARD_SPACES[hoveredSpaceId].color}, ${BOARD_SPACES[hoveredSpaceId].color}cc)` }} />
+                                        )}
+                                        <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#CBB26A] mb-1">{BOARD_SPACES[hoveredSpaceId].country || 'Exclusive'}</div>
+                                        <div className="text-xl font-black text-white mb-2 leading-tight">{BOARD_SPACES[hoveredSpaceId].name}</div>
+
+                                        {boardState[hoveredSpaceId]?.ownerId ? (
+                                            <div className="flex flex-col items-center gap-2 mb-4">
+                                                <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Owner</div>
+                                                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10">
+                                                    <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_10px_currentColor]" style={{ backgroundColor: players.find(p => p.id === boardState[hoveredSpaceId].ownerId)?.color, color: players.find(p => p.id === boardState[hoveredSpaceId].ownerId)?.color }} />
+                                                    <span className="text-xs font-black text-white">{players.find(p => p.id === boardState[hoveredSpaceId].ownerId)?.name}</span>
+                                                </div>
+                                            </div>
+                                        ) : BOARD_SPACES[hoveredSpaceId].price ? (
+                                            <div className="text-xl font-mono font-black text-white mb-4 bg-white/5 px-4 py-1 rounded-xl border border-white/5 shadow-inner">${BOARD_SPACES[hoveredSpaceId].price}</div>
+                                        ) : null}
+
+                                        <div className="w-full space-y-2 text-left border-t border-white/10 pt-4">
+                                            {BOARD_SPACES[hoveredSpaceId].type === 'property' && BOARD_SPACES[hoveredSpaceId].rent && (
+                                                <>
+                                                    <div className="flex justify-between text-[10px] font-bold">
+                                                        <span className="text-slate-500 uppercase">Rent Only</span>
+                                                        <span className="text-white">${BOARD_SPACES[hoveredSpaceId].rent[0]}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-[10px] font-bold">
+                                                        <span className="text-slate-500 uppercase">With Hotel</span>
+                                                        <span className="text-[#CBB26A]">${BOARD_SPACES[hoveredSpaceId].rent[5]}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-2 mt-2 border-t border-white/5">
+                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Build Cost</span>
+                                                        <span className="text-[11px] font-mono font-bold text-white">${BOARD_SPACES[hoveredSpaceId].housePrice} / house</span>
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {BOARD_SPACES[hoveredSpaceId].type === 'station' && (
+                                                <>
+                                                    <div className="flex justify-between text-[10px] items-center"><span className="text-slate-500 font-bold uppercase">1 Owned</span><span className="text-white">$25</span></div>
+                                                    <div className="flex justify-between text-[10px] items-center"><span className="text-slate-500 font-bold uppercase">2 Owned</span><span className="text-white">$50</span></div>
+                                                    <div className="flex justify-between text-[10px] items-center"><span className="text-slate-500 font-bold uppercase">3 Owned</span><span className="text-white">$100</span></div>
+                                                    <div className="flex justify-between text-[10px] items-center"><span className="text-slate-500 font-bold uppercase">4 Owned</span><span className="text-[#CBB26A]">$200</span></div>
+                                                </>
+                                            )}
+
+                                            {BOARD_SPACES[hoveredSpaceId].type === 'utility' && (
+                                                <div className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed text-center italic py-2">
+                                                    Rent is 4x roll if 1 owned, <br /> or 10x roll if both owned.
+                                                </div>
+                                            )}
+
+                                            {BOARD_SPACES[hoveredSpaceId].type === 'tax' && (
+                                                <div className="text-[10px] text-rose-400 font-black text-center uppercase tracking-widest py-2">
+                                                    Government Fee <br /> ${BOARD_SPACES[hoveredSpaceId].price || '10%'}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                             {/* LUXURY CENTER LOGO */}
                             <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none select-none">
                                 <div className="text-[6vw] font-black tracking-tighter text-white rotate-[-45deg] blur-[3px]">OPOLY</div>
                             </div>
 
-                            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="absolute flex flex-col items-center justify-center mb-28">
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="absolute flex flex-col items-center justify-center top-[12%]">
 
-                                <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tighter drop-shadow-2xl">
-                                    MEDITERRAN<span className="text-[#CBB26A]">OPOLY</span>
+                                <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-white tracking-[0.2em] drop-shadow-[0_10px_30px_rgba(0,0,0,1)] flex items-center">
+                                    <span className="opacity-20">M</span>EDITERRAN<span className="text-[#CBB26A] drop-shadow-[0_0_20px_rgba(203,178,106,0.3)]">OPOLY</span>
                                 </h1>
-                                <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-[#CBB26A] to-transparent mt-2" />
+                                <div className="w-24 h-[1px] bg-gradient-to-r from-transparent via-[#CBB26A]/30 to-transparent mt-3" />
                             </motion.div>
                             {/* Animated Dice Engine in 3D */}
-                            <div className="flex gap-4 md:gap-8 mb-6 sm:mb-8 h-16 sm:h-24 md:h-32 items-center justify-center p-2">
+                            <div className="absolute inset-x-0 top-[28%] flex gap-4 md:gap-8 h-16 sm:h-24 md:h-32 items-center justify-center p-2">
                                 {diceRoll || isRolling ? (
                                     <div className="flex w-[200px] sm:w-[320px] h-full relative">
                                         <Canvas shadows camera={{ position: [0, 10, 4], fov: 28 }}>
@@ -611,37 +690,91 @@ export const Board = () => {
                             </div>
 
                             {players.length > 0 && (
-                                <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 4 }} className="text-center font-black text-white mb-8 sm:mb-12 pointer-events-auto flex items-center gap-4 bg-white/5 backdrop-blur-lg px-8 py-3 rounded-2xl border border-white/10 text-sm sm:text-base shadow-2xl">
-                                    <div className="w-4 h-4 rounded-full shadow-[0_0_15px_currentColor]" style={{ backgroundColor: players[currentTurn].color, color: players[currentTurn].color }} />
-                                    <span className="tracking-[0.1em] uppercase">{players[currentTurn].name}'s Turn</span>
+                                <motion.div
+                                    animate={{ y: [0, -5, 0] }}
+                                    transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+                                    className="absolute top-[55%] inset-x-0 mx-auto w-fit text-center font-black text-white pointer-events-auto flex items-center gap-4 bg-white/5 backdrop-blur-xl px-10 py-4 rounded-3xl border border-white/10 text-xs sm:text-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+                                >
+                                    <div className="w-3 h-3 rounded-full shadow-[0_0_15px_currentColor] animate-pulse" style={{ backgroundColor: players[currentTurn].color, color: players[currentTurn].color }} />
+                                    <span className="tracking-[0.2em] uppercase">{players[currentTurn].name}'s Turn</span>
                                 </motion.div>
                             )}
 
-                            <div className="flex flex-row gap-4 sm:gap-8 pointer-events-auto">
-                                <button
-                                    onClick={handleRollClick}
-                                    disabled={!canRoll}
-                                    className={`px-12 sm:px-16 py-5 sm:py-6 rounded-2xl font-black text-sm sm:text-lg tracking-[0.2em] bg-[#CBB26A] text-[#0A0810] hover:bg-[#DBC27A] hover:scale-105 active:scale-95 transition-all shadow-[0_10px_40px_rgba(203,178,106,0.4)] flex items-center gap-3 group ${!canRoll ? 'opacity-0 pointer-events-none scale-90' : 'scale-100'}`}
-                                >
-                                    ROLL DICE <div className="w-6 h-6 bg-[#0A0810] rounded flex items-center justify-center text-[10px] text-[#CBB26A] group-hover:rotate-12 transition-transform">🎲</div>
-                                </button>
-                                <button
-                                    onClick={() => { if (canEndTurn) endTurn() }}
-                                    disabled={!canEndTurn}
-                                    className={`px-12 sm:px-16 py-5 sm:py-6 rounded-2xl font-black text-sm sm:text-lg tracking-[0.2em] border-2 border-[#CBB26A] text-[#CBB26A] hover:bg-[#CBB26A] hover:text-[#0A0810] hover:scale-105 active:scale-95 transition-all shadow-[0_10px_30px_rgba(203,178,106,0.2)] ${!canEndTurn ? 'opacity-0 pointer-events-none scale-90' : 'scale-100'}`}
-                                >
-                                    END TURN
-                                </button>
+                            <div className="absolute bottom-[8%] flex flex-col items-center gap-4 pointer-events-auto w-full px-12">
+                                {players.length > 0 && !boardState[players[currentTurn].position]?.ownerId && BOARD_SPACES[players[currentTurn].position].type === 'property' && hasRolled && !isMoving && (
+                                    <button
+                                        onClick={() => buyProperty(players[currentTurn].id, players[currentTurn].position)}
+                                        className="w-full max-w-xs py-4 rounded-full font-black text-[10px] sm:text-xs tracking-[0.4em] bg-emerald-500 text-white hover:bg-emerald-400 hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] flex items-center justify-center gap-4 group border border-emerald-400/20"
+                                    >
+                                        BUY PROPERTY <div className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-[10px] text-white">$</div>
+                                    </button>
+                                )}
+
+                                <div className="flex flex-row gap-4 sm:gap-6 w-full justify-center">
+                                    <button
+                                        onClick={handleRollClick}
+                                        disabled={!canRoll}
+                                        className={`flex-1 max-w-[170px] py-4 rounded-full font-black text-[10px] sm:text-xs tracking-[0.3em] bg-[#CBB26A] text-[#0A0810] hover:bg-[#DBC27A] hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(203,178,106,0.2)] flex items-center justify-center gap-3 group ${!canRoll ? 'opacity-0 scale-90 pointer-events-none' : 'scale-100'}`}
+                                    >
+                                        ROLL <div className="w-4 h-4 bg-[#0A0810]/20 rounded-md flex items-center justify-center text-[8px] group-hover:rotate-45 transition-transform">🎲</div>
+                                    </button>
+                                    <button
+                                        onClick={() => { if (canEndTurn) endTurn() }}
+                                        disabled={!canEndTurn}
+                                        className={`flex-1 max-w-[170px] py-4 rounded-full font-black text-[10px] sm:text-xs tracking-[0.3em] border border-[#CBB26A]/30 text-[#CBB26A] bg-black/40 backdrop-blur-md hover:bg-[#CBB26A] hover:text-[#0A0810] hover:scale-105 active:scale-95 transition-all ${!canEndTurn ? 'opacity-0 scale-90 pointer-events-none' : 'scale-100'}`}
+                                    >
+                                        END TURN
+                                    </button>
+                                </div>
                             </div>
 
-                            {/* Center Cards Overlay */}
+                            {/* Purchase Modal / Property Info Center */}
                             <AnimatePresence>
+                                {activeModalSpaceId !== null && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.8, y: 30 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.8, y: 30 }}
+                                        className="absolute z-[100] bg-[#111827]/95 backdrop-blur-2xl border border-[#CBB26A]/30 p-8 rounded-[2.5rem] shadow-[0_50px_100px_rgba(0,0,0,0.9)] w-80 pointer-events-auto flex flex-col items-center"
+                                    >
+                                        <button
+                                            onClick={() => setActiveModalSpaceId(null)}
+                                            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-white/40 hover:text-white transition-colors"
+                                        >✕</button>
+
+                                        <div className="w-full h-12 rounded-2xl mb-6 shadow-inner" style={{ backgroundColor: BOARD_SPACES[activeModalSpaceId].color || '#CBB26A', background: `linear-gradient(to bottom, ${BOARD_SPACES[activeModalSpaceId].color || '#CBB26A'}, ${BOARD_SPACES[activeModalSpaceId].color || '#CBB26A'}cc)` }} />
+
+                                        <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#CBB26A] mb-2">Investment Opportunity</div>
+                                        <h2 className="text-2xl font-black text-white mb-2 text-center leading-none tracking-tighter">{BOARD_SPACES[activeModalSpaceId].name}</h2>
+                                        <div className="text-xs font-bold text-slate-500 mb-6 uppercase tracking-widest">{BOARD_SPACES[activeModalSpaceId].country || 'Exclusive'}</div>
+
+                                        <div className="grid grid-cols-2 gap-4 w-full mb-8">
+                                            <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col items-center">
+                                                <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Cost</div>
+                                                <div className="text-lg font-mono font-bold text-white">${BOARD_SPACES[activeModalSpaceId].price}</div>
+                                            </div>
+                                            <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col items-center">
+                                                <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Rent</div>
+                                                <div className="text-lg font-mono font-bold text-[#CBB26A]">${BOARD_SPACES[activeModalSpaceId].rent ? BOARD_SPACES[activeModalSpaceId].rent[0] : '0'}</div>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => buyProperty(players[currentTurn].id, activeModalSpaceId)}
+                                            className="w-full py-4 rounded-2xl bg-[#CBB26A] text-[#0A0810] font-black text-sm tracking-[0.2em] shadow-[0_10px_30px_rgba(203,178,106,0.2)] hover:bg-[#DBC27A] hover:scale-[1.02] active:scale-95 transition-all mb-4"
+                                        >
+                                            ACQUIRE ASSET
+                                        </button>
+                                        <div className="text-[9px] text-slate-500 font-bold uppercase tracking-tight italic">Increase your net worth and dominate the coast</div>
+                                    </motion.div>
+                                )}
+
                                 {activeCard && (
                                     <motion.div
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -20 }}
-                                        className={`absolute pointer-events-auto p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border overflow-hidden ${activeCard.type === 'chance' ? 'bg-[#2A1D11] border-[#EAB308]' : 'bg-[#112030] border-[#38BDF8]'}`}
+                                        className={`absolute z-[110] pointer-events-auto p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center border overflow-hidden ${activeCard.type === 'chance' ? 'bg-[#2A1D11] border-[#EAB308]' : 'bg-[#112030] border-[#38BDF8]'}`}
                                     >
                                         <h3 className={`text-xl font-black uppercase tracking-widest mb-2 ${activeCard.type === 'chance' ? 'text-[#EAB308]' : 'text-[#38BDF8]'}`}>
                                             {activeCard.type === 'chance' ? 'Surprise' : 'Treasure'}
