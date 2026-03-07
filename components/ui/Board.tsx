@@ -4,7 +4,7 @@ import { useGameStore, BOARD_SPACES } from '../../store/useGameStore';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
-import { Car, Zap, Droplets, Plane, Play, Lock, Siren, Send, ArrowRight, Sparkles, ChevronLeft, ChevronRight, Coins, Palmtree, Gavel, Home, DollarSign, Shuffle, RefreshCw } from 'lucide-react';
+import { Car, Zap, Droplets, Plane, Play, Lock, Siren, Send, ArrowRight, Sparkles, ChevronLeft, ChevronRight, Coins, Palmtree, Gavel, Home, DollarSign, Shuffle, RefreshCw, Volume2, VolumeX, Volume1 } from 'lucide-react';
 import { useTexture } from '@react-three/drei';
 
 const getGridArea = (id: number) => {
@@ -148,13 +148,279 @@ const TOKEN_SHAPES: Record<string, (color: string, size: number) => React.ReactN
     ),
 };
 
+const playMonopolyChime = (volume: number) => {
+    if (volume <= 0) return;
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const playNote = (freq: number, startTime: number, duration: number, type: OscillatorType) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+            gain.gain.setValueAtTime(0, ctx.currentTime + startTime);
+            gain.gain.linearRampToValueAtTime(0.15 * volume, ctx.currentTime + startTime + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+            osc.start(ctx.currentTime + startTime);
+            osc.stop(ctx.currentTime + startTime + duration);
+        };
+        // A magical uplifting major arpeggio
+        playNote(523.25, 0.0, 0.6, 'sine'); // C5
+        playNote(659.25, 0.1, 0.6, 'sine'); // E5
+        playNote(783.99, 0.2, 0.6, 'sine'); // G5
+        playNote(1046.50, 0.3, 0.8, 'triangle'); // C6
+        playNote(1318.51, 0.4, 1.2, 'triangle'); // E6
+        playNote(2093.00, 0.4, 2.0, 'sine'); // C7 sparkle
+    } catch (e) {
+        console.error("Audio not supported");
+    }
+};
+
+const playDiceRollSound = (volume: number) => {
+    if (volume <= 0) return;
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+
+        // We create a sequence of short "clicks" and "clacks" to simulate dice hitting a board
+        const rollDuration = 0.4; // seconds
+        const notes = [
+            { time: 0.0, freq: 800 },
+            { time: 0.08, freq: 1100 },
+            { time: 0.15, freq: 950 },
+            { time: 0.22, freq: 1050 },
+            { time: 0.3, freq: 850 },
+            { time: 0.4, freq: 700 }, // final thud
+        ];
+
+        notes.forEach(note => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.type = 'triangle'; // triangle gives a nice wooden/plastic clack sound
+            osc.frequency.setValueAtTime(note.freq, ctx.currentTime + note.time);
+
+            // Short burst envelope for each clack
+            gain.gain.setValueAtTime(0, ctx.currentTime + note.time);
+            gain.gain.linearRampToValueAtTime(0.3 * volume, ctx.currentTime + note.time + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + note.time + 0.05);
+
+            osc.start(ctx.currentTime + note.time);
+            osc.stop(ctx.currentTime + note.time + 0.05);
+        });
+
+        // Add a low thud for the final impact
+        const thudOsc = ctx.createOscillator();
+        const thudGain = ctx.createGain();
+        thudOsc.connect(thudGain);
+        thudGain.connect(ctx.destination);
+        thudOsc.type = 'sine';
+        thudOsc.frequency.setValueAtTime(150, ctx.currentTime + rollDuration);
+        thudOsc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + rollDuration + 0.1);
+        thudGain.gain.setValueAtTime(0, ctx.currentTime + rollDuration);
+        thudGain.gain.linearRampToValueAtTime(0.4 * volume, ctx.currentTime + rollDuration + 0.02);
+        thudGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + rollDuration + 0.2);
+        thudOsc.start(ctx.currentTime + rollDuration);
+        thudOsc.stop(ctx.currentTime + rollDuration + 0.2);
+
+    } catch (e) {
+        console.error("Audio not supported");
+    }
+};
+
+const playTrainSound = (volume: number) => {
+    if (volume <= 0) return;
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+
+        // Train horn: A minor 3rd (e.g. Eb4 & Gb4) played loud and wide
+        const playHorn = (freq: number, startTime: number, duration: number) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.type = 'sawtooth';
+            // slight pitch bend down
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+            osc.frequency.exponentialRampToValueAtTime(freq * 0.95, ctx.currentTime + startTime + duration);
+
+            // Envelope
+            gain.gain.setValueAtTime(0, ctx.currentTime + startTime);
+            gain.gain.linearRampToValueAtTime(0.12 * volume, ctx.currentTime + startTime + 0.1);
+            gain.gain.setValueAtTime(0.12 * volume, ctx.currentTime + startTime + duration - 0.2);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+
+            osc.start(ctx.currentTime + startTime);
+            osc.stop(ctx.currentTime + startTime + duration);
+        };
+
+        const playChug = (startTime: number) => {
+            const bufferSize = ctx.sampleRate * 0.1;
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 400;
+
+            const gain = ctx.createGain();
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+
+            gain.gain.setValueAtTime(0, ctx.currentTime + startTime);
+            gain.gain.linearRampToValueAtTime(0.1 * volume, ctx.currentTime + startTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + 0.1);
+
+            noise.start(ctx.currentTime + startTime);
+        };
+
+        // Double horn
+        playHorn(311.13, 0.0, 1.2); // Eb4
+        playHorn(369.99, 0.0, 1.2); // Gb4
+        playHorn(311.13, 1.4, 1.5);
+        playHorn(369.99, 1.4, 1.5);
+
+        // Chug sequence
+        for (let i = 0; i < 15; i++) {
+            playChug(0.2 * i);
+        }
+
+    } catch (e) {
+        console.error("Audio not supported");
+    }
+};
+
+const playBuildSound = (volume: number) => {
+    if (volume <= 0) return;
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+
+        // High hammer ding
+        const ding = ctx.createOscillator();
+        const dingGain = ctx.createGain();
+        ding.connect(dingGain);
+        dingGain.connect(ctx.destination);
+        ding.type = 'sine';
+        ding.frequency.setValueAtTime(800, ctx.currentTime);
+        ding.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+        dingGain.gain.setValueAtTime(0, ctx.currentTime);
+        dingGain.gain.linearRampToValueAtTime(0.3 * volume, ctx.currentTime + 0.02);
+        dingGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        ding.start(ctx.currentTime);
+        ding.stop(ctx.currentTime + 0.3);
+
+        // Deeper wood block
+        const wood = ctx.createOscillator();
+        const woodGain = ctx.createGain();
+        wood.connect(woodGain);
+        woodGain.connect(ctx.destination);
+        wood.type = 'triangle';
+        wood.frequency.setValueAtTime(300, ctx.currentTime);
+        wood.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.1);
+        woodGain.gain.setValueAtTime(0, ctx.currentTime);
+        woodGain.gain.linearRampToValueAtTime(0.4 * volume, ctx.currentTime + 0.01);
+        woodGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        wood.start(ctx.currentTime);
+        wood.stop(ctx.currentTime + 0.2);
+
+    } catch (e) {
+        console.error("Audio not supported");
+    }
+};
+
+const playHotelSound = (volume: number) => {
+    if (volume <= 0) return;
+    try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+
+        // Celestial chord approach
+        const baseFreq = 800;
+        const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5, baseFreq * 2]; // Major chord
+
+        notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+
+            // Start note
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + (i * 0.05));
+            gain.gain.setValueAtTime(0, ctx.currentTime + (i * 0.05));
+            gain.gain.linearRampToValueAtTime(0.2 * volume, ctx.currentTime + (i * 0.05) + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (i * 0.05) + 0.8);
+
+            osc.start(ctx.currentTime + (i * 0.05));
+            osc.stop(ctx.currentTime + (i * 0.05) + 1);
+        });
+    } catch (e) {
+        console.error("Audio not supported");
+    }
+};
+
+const CountryFlag = ({ country }: { country: string }) => {
+    // using high-quality flag cdn
+    const flags: Record<string, string> = {
+        'Tunisia': 'tn',
+        'Algeria': 'dz',
+        'Morocco': 'ma',
+        'France': 'fr',
+        'Italy': 'it',
+        'Spain': 'es',
+        'Portugal': 'pt',
+        'Greece': 'gr'
+    };
+
+    const code = flags[country];
+    if (!code) return null;
+
+    return (
+        <div className="w-5 h-5 sm:w-7 sm:h-7 rounded-full overflow-hidden border-2 border-white/50 shadow-[0_8px_20px_rgba(0,0,0,0.6)] flex items-center justify-center bg-white/10 backdrop-blur-md relative transition-all group-hover/space:scale-125 group-hover/space:border-white group-hover/space:shadow-[0_0_20px_rgba(255,255,255,0.5)]">
+            <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent z-10 pointer-events-none" />
+            <div className="absolute inset-0 shadow-[inset_0_0_12px_rgba(255,255,255,0.5)] rounded-full z-20 pointer-events-none" />
+            <img
+                src={`https://flagcdn.com/w80/${code}.png`}
+                alt={country}
+                className="w-full h-full object-cover scale-150 saturate-125"
+            />
+        </div>
+    );
+};
+
 const PlayerToken = ({ color, shape, size = 36, isActive = false }: { color: string; shape: string; size?: number; isActive?: boolean }) => {
     const svgFn = TOKEN_SHAPES[shape] || TOKEN_SHAPES['sphere'];
     return (
         <motion.div
-            animate={isActive ? { y: [0, -5, 0] } : {}}
-            transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
-            style={{ filter: `drop-shadow(0 6px 12px ${color}88) drop-shadow(0 0 20px ${color}44)` }}
+            animate={isActive ? {
+                y: [0, -8, 0],
+                scale: [1, 1.15, 1],
+                filter: [
+                    `drop-shadow(0 6px 12px ${color}88) drop-shadow(0 0 20px ${color}44)`,
+                    `drop-shadow(0 12px 24px ${color}AA) drop-shadow(0 0 35px ${color}77)`,
+                    `drop-shadow(0 6px 12px ${color}88) drop-shadow(0 0 20px ${color}44)`
+                ]
+            } : {}}
+            transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+            initial={false}
         >
             {svgFn(color, size)}
         </motion.div>
@@ -250,9 +516,41 @@ const RuleToggle = ({ icon: Icon, title, description, value, onChange }: { icon:
 );
 
 export const Board = () => {
-    const { players, currentTurn, boardState, rollDice, endTurn, diceRoll, activeCard, activeTrade, hasRolled, respondToTrade, proposeTrade, chatMessages, sendMessage, activeModalSpaceId, setActiveModalSpaceId, buyProperty, isMoving, dicePreference, setDicePreference, monopolyRequiredToBuild, setMonopolyRequiredToBuild, buildHouse, rules, setRule, postBail } = useGameStore();
+    const { players, currentTurn, boardState, rollDice, endTurn, diceRoll, activeCard, activeTrade, gameLogs, tradeHistory, hasRolled, respondToTrade, proposeTrade, chatMessages, sendMessage, activeModalSpaceId, setActiveModalSpaceId, buyProperty, isMoving, dicePreference, setDicePreference, monopolyRequiredToBuild, setMonopolyRequiredToBuild, buildHouse, rules, setRule, postBail, soundVolume, setSoundVolume, activeAuction, placeBid, endAuction } = useGameStore();
     const [isRolling, setIsRolling] = useState(false);
     const [hoveredSpaceId, setHoveredSpaceId] = useState<number | null>(null);
+    const [monopolyCelebration, setMonopolyCelebration] = useState<{ country: string, ownerId: string } | null>(null);
+    const prevBoardState = React.useRef(boardState);
+
+    useEffect(() => {
+        Object.entries(boardState).forEach(([spaceId, state]) => {
+            const id = Number(spaceId);
+            const prev = prevBoardState.current?.[id];
+            const space = BOARD_SPACES[id];
+
+            if (prev && state.houses > prev.houses) {
+                if (state.houses === 5) {
+                    playHotelSound(soundVolume);
+                } else {
+                    playBuildSound(soundVolume);
+                }
+            }
+
+            if (state.ownerId && space.type === 'property' && space.country && (!prev || prev.ownerId !== state.ownerId)) {
+                const country = space.country;
+                const countryProps = BOARD_SPACES.filter(s => s.country === country);
+                const allOwned = countryProps.every(s => boardState[s.id]?.ownerId === state.ownerId);
+                const previouslyOwned = countryProps.every(s => prevBoardState.current?.[s.id]?.ownerId === state.ownerId);
+                if (allOwned && !previouslyOwned) {
+                    setMonopolyCelebration({ country, ownerId: state.ownerId });
+                    playMonopolyChime(soundVolume);
+                    setTimeout(() => setMonopolyCelebration(null), 5000);
+                }
+            }
+        });
+        prevBoardState.current = boardState;
+    }, [boardState]);
+
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatInput, setChatInput] = useState('');
     const chatEndRef = React.useRef<HTMLDivElement>(null);
@@ -281,6 +579,7 @@ export const Board = () => {
     const [requestMoney, setRequestMoney] = useState(0);
     const [offeredPropertyIds, setOfferedPropertyIds] = useState<number[]>([]);
     const [requestPropertyIds, setRequestPropertyIds] = useState<number[]>([]);
+    const [bidAmount, setBidAmount] = useState(0);
 
     const AVAILABLE_COLORS = ['#F9D342', '#F97316', '#EF4444', '#EC4899', '#8A58FF', '#38BDF8', '#22C55E', '#A8A29E'];
 
@@ -332,7 +631,14 @@ export const Board = () => {
     const handleRollClick = () => {
         if (!canRoll) return;
         setIsRolling(true);
-        setTimeout(() => setIsRolling(false), 300);
+        playDiceRollSound(soundVolume);
+        setTimeout(() => {
+            setIsRolling(false);
+            const currentRoll = useGameStore.getState().diceRoll;
+            if (currentRoll && currentRoll[0] + currentRoll[1] === 12) {
+                playTrainSound(soundVolume);
+            }
+        }, 300);
         rollDice();
     };
 
@@ -411,37 +717,90 @@ export const Board = () => {
                         </div>
                     </div>
                 ) : (
-                    /* ACTIVE GAME SIDEBAR CONTENT - SIMPLIFIED */
-                    <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
-                        <div className="bg-[#0E0B16] p-5 rounded-2xl border border-[#2A2438] shadow-xl">
-                            <div className="text-[10px] text-[#CBB26A] font-black uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#CBB26A]" />
-                                Game Information
-                            </div>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Mode</span>
-                                    <span className="text-xs text-white font-black">Local Multiplayer</span>
-                                </div>
-                                <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Game Status</span>
-                                    <span className="text-xs text-emerald-400 font-black animate-pulse">Running</span>
-                                </div>
-                                <div className="pt-2">
-                                    <button className="w-full bg-white/5 hover:bg-white/10 text-slate-300 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all">
-                                        View Log
-                                    </button>
-                                </div>
-                            </div>
+                    /* ACTIVE GAME SIDEBAR CONTENT - ACTIVITY LOG */
+                    <div className="flex flex-col h-full overflow-hidden w-full">
+                        <div className="px-5 py-6 bg-[#0A0810] border-b border-white/5 flex items-center justify-between shadow-sm z-10 shrink-0">
+                            <span className="text-sm text-[#CBB26A] font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                                <Sparkles size={16} className="text-[#CBB26A]" /> Activity Log
+                            </span>
                         </div>
+                        <div className="p-4 flex flex-col gap-3 overflow-y-auto flex-1 custom-scrollbar w-full">
+                            {gameLogs.length === 0 ? (
+                                <div className="text-center text-slate-500 font-bold text-xs uppercase tracking-widest opacity-50 my-auto">
+                                    No events yet
+                                </div>
+                            ) : (
+                                gameLogs.map((log) => {
+                                    const p = players.find(player => player.id === log.playerId);
+                                    const cp = log.targetPlayerId ? players.find(player => player.id === log.targetPlayerId) : null;
+                                    if (!p) return null;
 
-                        {/* Quick controls could go here or additional stats */}
+                                    let icon = "🎲";
+                                    let bgClass = "bg-[#0E0B16] border-white/5";
+                                    let highlightClass = "text-[#CBB26A]";
+
+                                    switch (log.type) {
+                                        case 'purchase': icon = "🏡"; highlightClass = "text-emerald-400"; break;
+                                        case 'rent': icon = "💸"; highlightClass = "text-rose-400"; break;
+                                        case 'monopoly': icon = "🏆"; highlightClass = "text-amber-400"; bgClass = "bg-amber-950/20 border-amber-900/50"; break;
+                                        case 'jail': icon = "🚔"; highlightClass = "text-red-500"; bgClass = "bg-red-950/20 border-red-900/50"; break;
+                                        case 'bail': icon = "🗝️"; highlightClass = "text-green-400"; break;
+                                        case 'pass_go': icon = "🏁"; highlightClass = "text-yellow-400"; break;
+                                        case 'house': icon = "🏗️"; highlightClass = "text-blue-400"; break;
+                                        case 'setup': icon = "🎲"; highlightClass = "text-purple-400"; break;
+                                        case 'event': icon = "🃏"; highlightClass = "text-[#38BDF8]"; break;
+                                        case 'tax': icon = "🏛️"; highlightClass = "text-red-400"; break;
+                                        default: break;
+                                    }
+
+                                    return (
+                                        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} key={log.id} className={`shrink-0 rounded-2xl p-4 flex gap-3 items-center justify-start border shadow-md relative overflow-hidden group transition-all hover:bg-white/5 ${bgClass} w-full`}>
+                                            <div className="text-xl leading-none shrink-0 pointer-events-none drop-shadow-lg">{icon}</div>
+                                            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                                                <div className="flex items-center gap-1 flex-wrap">
+                                                    <div className="w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] shrink-0" style={{ backgroundColor: p.color, color: p.color }} />
+                                                    <span className="text-[11px] font-black text-slate-200 truncate max-w-[80px]" style={{ color: p.color }}>{p.name}</span>
+                                                    {cp && (
+                                                        <>
+                                                            <ArrowRight size={10} className="text-slate-500 shrink-0 mx-0.5" />
+                                                            <div className="w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] shrink-0" style={{ backgroundColor: cp.color, color: cp.color }} />
+                                                            <span className="text-[11px] font-black text-slate-200 truncate max-w-[80px]" style={{ color: cp.color }}>{cp.name}</span>
+                                                        </>
+                                                    )}
+                                                    <span className="text-[9px] text-slate-600 font-mono ml-auto shrink-0 pl-1">
+                                                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                                <span className="text-[13px] font-bold text-slate-300 leading-snug mt-1 text-left w-full break-words whitespace-normal">
+                                                    {log.message}
+                                                </span>
+                                                {log.amount !== undefined && (
+                                                    <div className={`text-[12px] font-mono font-black mt-1 text-left ${highlightClass}`}>
+                                                        ${log.amount}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
 
             <div className="flex-1 relative flex items-center justify-center p-1 sm:p-2 lg:p-4 overflow-hidden bg-[#0A0810]">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#1A1726_0%,_#0A0810_100%)] opacity-50" />
+
+                {/* Audio Toggle Top Right Corner */}
+                <div className="absolute top-6 right-6 z-[500] pointer-events-auto">
+                    <button
+                        onClick={() => setSoundVolume(soundVolume === 0 ? 0.4 : soundVolume === 0.4 ? 1 : 0)}
+                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#1A1625]/80 backdrop-blur-md border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-[#2A2438] hover:border-[#CBB26A]/50 transition-all shadow-xl active:scale-95 group relative"
+                    >
+                        {soundVolume === 0 ? <VolumeX size={20} className="text-rose-500" /> : soundVolume < 0.5 ? <Volume1 size={20} className="text-yellow-500 relative left-[-2px]" /> : <Volume2 size={20} className="text-emerald-400 group-hover:scale-110 transition-transform" />}
+                    </button>
+                </div>
 
                 {/* Fixed width container to keep board perfectly square natively */}
                 <div className="w-full h-full max-w-[92vh] max-h-[92vh] aspect-square relative transition-transform duration-500 z-10" style={{ perspective: "2000px" }}>
@@ -479,6 +838,7 @@ export const Board = () => {
                                         boxShadow: "0 20px 40px rgba(0,0,0,0.5)"
                                     }}
                                     className="relative flex flex-col items-center justify-center overflow-hidden transition-all duration-200 border cursor-pointer group/space"
+                                    onClick={() => (space.type === 'property' || space.type === 'station' || space.type === 'utility') && setActiveModalSpaceId(id)}
                                     style={{
                                         gridRow,
                                         gridColumn,
@@ -522,17 +882,46 @@ export const Board = () => {
                                             }}
                                         >
                                             {/* House/Hotel indicator on the color band */}
-                                            {bState?.houses > 0 && (
-                                                <div className="flex gap-0.5 pointer-events-none items-center justify-center w-full h-full">
-                                                    {bState.houses < 5 ? (
-                                                        Array.from({ length: bState.houses }).map((_, i) => (
-                                                            <div key={i} className="text-[10px] leading-none drop-shadow-md">🏠</div>
-                                                        ))
-                                                    ) : (
-                                                        <div className="text-[11px] leading-none drop-shadow-[0_0_8px_white]">💎</div>
-                                                    )}
-                                                </div>
-                                            )}
+                                            <AnimatePresence mode="popLayout">
+                                                {bState?.houses > 0 && (
+                                                    <div className="flex gap-0.5 pointer-events-none items-center justify-center w-full h-full relative">
+                                                        {bState.houses < 5 ? (
+                                                            Array.from({ length: bState.houses }).map((_, i) => (
+                                                                <motion.div
+                                                                    key={`house-${i}-${bState.houses}`}
+                                                                    initial={{ scale: 0, rotate: -45, opacity: 0 }}
+                                                                    animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                                                                    transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                                                                    className="text-[10px] sm:text-[11px] leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] relative"
+                                                                >
+                                                                    🏠
+                                                                    {i === bState.houses - 1 && (
+                                                                        <motion.div
+                                                                            initial={{ scale: 0, opacity: 1 }}
+                                                                            animate={{ scale: 4, opacity: 0 }}
+                                                                            className="absolute inset-0 bg-white rounded-full blur-md z-[-1]"
+                                                                        />
+                                                                    )}
+                                                                </motion.div>
+                                                            ))
+                                                        ) : (
+                                                            <motion.div
+                                                                key="hotel"
+                                                                initial={{ scale: 0, rotate: 180, opacity: 0 }}
+                                                                animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                                                                className="relative"
+                                                            >
+                                                                <div className="text-[12px] sm:text-[14px] leading-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)]">💎</div>
+                                                                <motion.div
+                                                                    initial={{ scale: 0, opacity: 1 }}
+                                                                    animate={{ scale: 6, opacity: 0 }}
+                                                                    className="absolute inset-0 bg-blue-400 rounded-full blur-xl z-[-1]"
+                                                                />
+                                                            </motion.div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </AnimatePresence>
                                             <span
                                                 className="font-black leading-none whitespace-nowrap select-none"
                                                 style={{
@@ -569,20 +958,36 @@ export const Board = () => {
                                                     innerEdge === 'left' ? 'pl-5 pr-1' : 'pr-5 pl-1')
                                                 : 'p-1'}`}
                                     >
-                                        <div className="flex flex-col items-center justify-center w-full gap-0.5">
+                                        <div className="flex flex-col items-center justify-center w-full h-full relative gap-0.5">
                                             {/* Corner tiles */}
-                                            {isCorner && id === 0 && <div className="text-2xl sm:text-3xl">🚩</div>}
+                                            {isCorner && id === 0 && <div className="text-2xl sm:text-3xl relative z-20 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">🚩</div>}
                                             {isCorner && id === 10 && (
-                                                <div className="flex flex-col items-center">
-                                                    <Lock size={22} className="text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.7)]" />
-                                                    <div className="text-[6px] font-black text-rose-300/40 uppercase tracking-tighter mt-1">Visit / InJail</div>
+                                                <div className="w-full h-full absolute inset-0 z-20 pointer-events-none rounded-[10px] sm:rounded-[14px]">
+                                                    <div className="absolute top-0 right-0 w-[68%] h-[68%] bg-gradient-to-br from-red-950 to-rose-950 border-b border-l border-rose-500/40 rounded-bl-[10px] sm:rounded-bl-[14px] flex flex-col items-center justify-center shadow-[-4px_4px_15px_rgba(0,0,0,0.8)] overflow-hidden">
+                                                        <div className="absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent,transparent_6px,rgba(0,0,0,0.7)_6px,rgba(0,0,0,0.7)_8px)] z-0" />
+                                                        <Lock size={16} className="text-white drop-shadow-[0_0_8px_white] z-10 mb-0.5 sm:scale-110" />
+                                                        <span className="text-[6px] sm:text-[7px] font-black text-rose-100 uppercase tracking-widest z-10 drop-shadow-md">Prison</span>
+                                                    </div>
+                                                    <div className="absolute bottom-1 sm:bottom-1.5 left-0 w-full text-center text-[6.5px] sm:text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] sm:tracking-[0.3em] font-mono leading-none z-0">Visiting</div>
+                                                    <div className="absolute top-[35%] left-[-20%] sm:left-[-15%] -rotate-90 origin-center text-[6.5px] sm:text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] sm:tracking-[0.3em] font-mono w-full text-center z-0">Just</div>
                                                 </div>
                                             )}
-                                            {isCorner && id === 20 && <div className="text-2xl sm:text-3xl">🌴</div>}
+                                            {isCorner && id === 20 && <div className="text-2xl sm:text-3xl relative z-20 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">🌴</div>}
                                             {isCorner && id === 30 && (
-                                                <div className="flex flex-col items-center">
-                                                    <Siren size={24} className="text-amber-500 animate-pulse drop-shadow-[0_0_12px_#fbbf24aa]" />
-                                                    <div className="text-[6px] font-black text-amber-300/40 uppercase tracking-tighter mt-1">Intercepted</div>
+                                                <div className="w-full h-full absolute inset-0 bg-gradient-to-br from-[#1A1A2E] to-[#0A0A18] flex flex-col items-center justify-center p-1 sm:p-2 z-20 rounded-[10px] sm:rounded-[14px] overflow-hidden">
+                                                    <div className="absolute top-1 right-1 opacity-80">
+                                                        <Siren size={12} className="text-blue-500 animate-pulse drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                                                    </div>
+                                                    <div className="absolute bottom-1 left-1 opacity-80">
+                                                        <Siren size={12} className="text-rose-500 animate-pulse drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]" style={{ animationDelay: '0.5s' }} />
+                                                    </div>
+                                                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-950/80 border-2 border-indigo-500/30 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.5)] mb-1 z-10 relative overflow-hidden backdrop-blur-sm">
+                                                        <Lock size={16} className="text-indigo-200 drop-shadow-[0_0_6px_currentColor] sm:scale-110" />
+                                                    </div>
+                                                    <div className="text-[7px] sm:text-[8.5px] font-black text-indigo-100 uppercase tracking-widest sm:tracking-[0.1em] text-center leading-[1.1] drop-shadow-[0_2px_4px_rgba(0,0,0,1)] flex flex-col z-10">
+                                                        <span>Go To</span>
+                                                        <span className="text-rose-400">Prison</span>
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -617,14 +1022,22 @@ export const Board = () => {
                                                 <div className="text-xl leading-none">🎁</div>
                                             )}
 
-                                            <span
-                                                className={`font-bold text-center w-full px-0.5 leading-tight
-                                                    ${isCorner ? 'text-[9px] sm:text-[10px] uppercase tracking-tight text-slate-200' : 'text-[7px] sm:text-[8px] text-slate-300'}
-                                                    max-w-full whitespace-pre-wrap break-words`}
-                                                style={{ textShadow: '0 1px 4px rgba(0,0,0,1)' }}
-                                            >
-                                                {isCorner ? space.name.split(' ').join('\n') : space.name}
-                                            </span>
+                                            {!(isCorner && (id === 10 || id === 30)) && space.type === 'property' && space.country && (
+                                                <div className="mb-0.5 sm:mb-1 drop-shadow-md z-10 filter hover:brightness-110">
+                                                    <CountryFlag country={space.country} />
+                                                </div>
+                                            )}
+
+                                            {!(isCorner && (id === 10 || id === 30)) && (
+                                                <span
+                                                    className={`font-bold text-center w-full px-0.5 leading-tight z-10
+                                                        ${isCorner ? 'text-[9px] sm:text-[10px] uppercase tracking-tight text-slate-200' : 'text-[7px] sm:text-[8px] text-slate-300'}
+                                                        max-w-full whitespace-pre-wrap break-words`}
+                                                    style={{ textShadow: '0 1px 4px rgba(0,0,0,1)' }}
+                                                >
+                                                    {isCorner ? space.name.split(' ').join('\n') : space.name}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
@@ -710,6 +1123,53 @@ export const Board = () => {
                             className="pointer-events-none relative w-full h-full"
                             style={{ gridRow: "2 / 11", gridColumn: "2 / 11" }}
                         >
+                            <AnimatePresence>
+                                {monopolyCelebration && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.5, y: 50 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 1.2, filter: "blur(10px)" }}
+                                        transition={{ type: "spring", damping: 15 }}
+                                        className="absolute z-[300] top-[15%] left-1/2 -translate-x-1/2 pointer-events-none flex flex-col items-center"
+                                    >
+                                        <div className="relative">
+                                            {/* Background sunburst rotation */}
+                                            <motion.div
+                                                animate={{ rotate: 360 }}
+                                                transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
+                                                className="absolute inset-[-100px] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(203,178,106,0.3)_30deg,transparent_60deg,rgba(203,178,106,0.3)_90deg,transparent_120deg,rgba(203,178,106,0.3)_150deg,transparent_180deg,rgba(203,178,106,0.3)_210deg,transparent_240deg,rgba(203,178,106,0.3)_270deg,transparent_300deg,rgba(203,178,106,0.3)_330deg,transparent_360deg)] drop-shadow-[0_0_50px_rgba(203,178,106,1)] rounded-full mix-blend-screen"
+                                                style={{ width: 'calc(100% + 200px)', height: 'calc(100% + 200px)' }}
+                                            />
+
+                                            <div className="bg-[#111827]/90 backdrop-blur-xl border-2 border-[#CBB26A] p-6 sm:p-8 rounded-[2rem] shadow-[0_20px_100px_rgba(203,178,106,0.5)] flex flex-col items-center relative overflow-hidden min-w-[300px]">
+                                                <div className="absolute inset-0 bg-gradient-to-t from-[#CBB26A]/20 to-transparent pointer-events-none" />
+
+                                                {/* Stars */}
+                                                <div className="flex gap-2 mb-2 text-[#CBB26A]">
+                                                    <Sparkles className="animate-pulse" />
+                                                    <Sparkles className="animate-pulse delay-100" />
+                                                    <Sparkles className="animate-pulse delay-200" />
+                                                </div>
+
+                                                <h2 className="text-[10px] sm:text-xs font-black uppercase text-[#CBB26A] tracking-[0.4em] mb-1 text-center">
+                                                    Monopoly Achieved!
+                                                </h2>
+                                                <h1 className="text-3xl sm:text-5xl font-black text-white px-8 text-center uppercase" style={{ textShadow: "0 4px 20px rgba(0,0,0,0.8)" }}>
+                                                    {monopolyCelebration.country}
+                                                </h1>
+
+                                                <div className="mt-4 flex items-center gap-3 bg-white/10 px-4 py-2 rounded-xl border border-white/20 relative z-10 w-fit">
+                                                    <div className="w-5 h-5 rounded-full shadow-[0_0_10px_currentColor]" style={{ backgroundColor: players.find(p => p.id === monopolyCelebration.ownerId)?.color, color: players.find(p => p.id === monopolyCelebration.ownerId)?.color }} />
+                                                    <span className="text-sm font-bold text-slate-200">
+                                                        {players.find(p => p.id === monopolyCelebration.ownerId)?.name} controls the zone!
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
                             {/* HOVER INFO PANEL */}
                             <AnimatePresence>
                                 {hoveredSpaceId !== null && (
@@ -889,17 +1349,36 @@ export const Board = () => {
                                 )}
 
                                 {players.length > 0 && (
-                                    <div className="flex flex-row gap-4 sm:gap-6 w-full justify-center">
+                                    <div className="flex flex-row gap-2 sm:gap-4 lg:gap-6 w-full justify-center">
+                                        {players[currentTurn].inJail && !hasRolled && players[currentTurn].money >= 100 && (
+                                            <motion.button
+                                                whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(244,63,94,0.4)" }}
+                                                whileTap={{ scale: 0.95 }}
+                                                onClick={() => postBail(players[currentTurn].id)}
+                                                className={`
+                                                    flex-1 max-w-[150px] sm:max-w-[180px] h-14 sm:h-16 rounded-2xl font-black text-[9px] sm:text-[10px] sm:tracking-[0.2em] uppercase 
+                                                    transition-all duration-300 relative overflow-hidden group
+                                                    bg-gradient-to-br from-rose-500 via-rose-600 to-rose-800 text-white shadow-[0_10px_20px_rgba(244,63,94,0.3)] cursor-pointer
+                                                `}
+                                            >
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-[120%] group-hover:animate-[shimmer_1.5s_infinite] skew-x-12" />
+                                                <div className="relative flex items-center justify-center gap-1 sm:gap-2 h-full">
+                                                    <span className="drop-shadow-sm text-center">PAY $100<br className="sm:hidden" /> BAIL</span>
+                                                    <Lock size={14} className="hidden sm:block" />
+                                                </div>
+                                            </motion.button>
+                                        )}
+
                                         <motion.button
                                             whileHover={canRoll ? { scale: 1.05, boxShadow: "0 30px 60px rgba(203,178,106,0.5)" } : {}}
                                             whileTap={canRoll ? { scale: 0.95 } : {}}
                                             onClick={handleRollClick}
                                             disabled={!canRoll}
                                             className={`
-                                                flex-1 max-w-[220px] h-16 rounded-2xl font-black text-[11px] tracking-[0.4em] uppercase 
+                                                flex-1 max-w-[180px] sm:max-w-[220px] h-14 sm:h-16 rounded-2xl font-black text-[10px] sm:text-[11px] sm:tracking-[0.4em] uppercase 
                                                 transition-all duration-500 relative overflow-hidden group
                                                 ${!canRoll
-                                                    ? 'opacity-0 scale-90 pointer-events-none'
+                                                    ? 'opacity-0 scale-90 pointer-events-none hidden'
                                                     : 'bg-gradient-to-br from-[#F0D080] via-[#CBB26A] to-[#8E793E] text-[#0A0810] shadow-[0_20px_40px_rgba(0,0,0,0.5)] cursor-pointer'
                                                 }
                                             `}
@@ -973,22 +1452,128 @@ export const Board = () => {
                                         </div>
 
                                         {!boardState[activeModalSpaceId]?.ownerId ? (
-                                            <button
-                                                onClick={() => buyProperty(players[currentTurn].id, activeModalSpaceId)}
-                                                className="w-full py-4 rounded-2xl bg-[#CBB26A] text-[#0A0810] font-black text-sm tracking-[0.2em] shadow-[0_10px_30px_rgba(203,178,106,0.2)] hover:bg-[#DBC27A] hover:scale-[1.02] active:scale-95 transition-all mb-4"
-                                            >
-                                                ACQUIRE ASSET
-                                            </button>
-                                        ) : boardState[activeModalSpaceId].ownerId === players[currentTurn].id && BOARD_SPACES[activeModalSpaceId].type === 'property' && boardState[activeModalSpaceId].houses < 5 ? (
-                                            <button
-                                                onClick={() => buildHouse(players[currentTurn].id, activeModalSpaceId)}
-                                                className="w-full py-4 rounded-2xl bg-[#8A58FF] text-white font-black text-sm tracking-[0.2em] shadow-[0_10px_30px_rgba(138,88,255,0.2)] hover:bg-[#9E75FF] hover:scale-[1.02] active:scale-95 transition-all mb-4"
-                                            >
-                                                BUILD UPGRADE (${BOARD_SPACES[activeModalSpaceId].housePrice})
-                                            </button>
+                                            <div className="flex flex-col gap-2 w-full mb-4">
+                                                <button
+                                                    onClick={() => buyProperty(players[currentTurn].id, activeModalSpaceId)}
+                                                    className="w-full py-4 rounded-2xl bg-[#CBB26A] text-[#0A0810] font-black text-sm tracking-[0.2em] shadow-[0_10px_30px_rgba(203,178,106,0.2)] hover:bg-[#DBC27A] hover:scale-[1.02] active:scale-95 transition-all"
+                                                >
+                                                    ACQUIRE ASSET
+                                                </button>
+                                                {rules.auctionEnabled && (
+                                                    <button
+                                                        onClick={() => useGameStore.getState().startAuction(activeModalSpaceId)}
+                                                        className="w-full py-3 rounded-2xl border border-amber-500/30 text-amber-500/80 hover:text-amber-400 hover:bg-amber-500/5 font-black text-xs tracking-[0.2em] transition-all"
+                                                    >
+                                                        START AUCTION
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : boardState[activeModalSpaceId].ownerId === players[currentTurn].id ? (
+                                            (() => {
+                                                const space = BOARD_SPACES[activeModalSpaceId];
+                                                const player = players[currentTurn];
+                                                const bState = boardState[activeModalSpaceId];
+
+                                                if (bState.isMortgaged) {
+                                                    const unmortgageCost = Math.floor((space.price || 0) * 0.55);
+                                                    const canAfford = player.money >= unmortgageCost;
+                                                    return (
+                                                        <div className="flex flex-col gap-2 w-full mb-4">
+                                                            <div className="w-full py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-center text-[10px] font-black uppercase tracking-widest font-bold">
+                                                                ASSET MORTGAGED
+                                                            </div>
+                                                            <button
+                                                                onClick={() => useGameStore.getState().unmortgageProperty(player.id, activeModalSpaceId)}
+                                                                disabled={!canAfford}
+                                                                className={`w-full py-4 rounded-2xl font-black text-sm tracking-[0.2em] transition-all ${canAfford
+                                                                    ? 'bg-emerald-600 text-white shadow-lg hover:bg-emerald-500 hover:scale-[1.02] active:scale-95'
+                                                                    : 'bg-white/5 border border-white/10 text-slate-500 cursor-not-allowed'
+                                                                    }`}
+                                                            >
+                                                                UNMORTGAGE (${unmortgageCost})
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                if (space.type !== 'property' || bState.houses >= 5) {
+                                                    return (
+                                                        <div className="flex flex-col gap-2 w-full mb-4">
+                                                            <div className="w-full py-4 rounded-2xl bg-white/5 border border-[#CBB26A]/20 text-[#CBB26A] text-center text-xs font-black uppercase tracking-widest font-bold">
+                                                                {bState.houses >= 5 ? 'ASSET MAXED OUT (HOTEL)' : 'YOU OWN THIS ASSET'}
+                                                            </div>
+                                                            {rules.mortgageEnabled && bState.houses === 0 && (
+                                                                <button
+                                                                    onClick={() => useGameStore.getState().mortgageProperty(player.id, activeModalSpaceId)}
+                                                                    className="w-full py-3 rounded-2xl border border-rose-500/30 text-rose-500/80 hover:text-rose-400 hover:bg-rose-500/5 font-black text-xs tracking-[0.2em] transition-all"
+                                                                >
+                                                                    MORTGAGE FOR ${Math.floor((space.price || 0) / 2)}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+
+                                                let canBuild = true;
+                                                let failReason = "";
+
+                                                if (player.money < (space.housePrice || 0)) {
+                                                    canBuild = false;
+                                                    failReason = "Not enough money";
+                                                }
+
+                                                if (canBuild && monopolyRequiredToBuild) {
+                                                    const totalInCountry = BOARD_SPACES.filter(s => s.country === space.country).length;
+                                                    const ownedInCountry = BOARD_SPACES.filter(s =>
+                                                        s.country === space.country &&
+                                                        boardState[s.id]?.ownerId === player.id
+                                                    ).length;
+                                                    if (ownedInCountry < totalInCountry) {
+                                                        canBuild = false;
+                                                        failReason = `Need all ${totalInCountry} cities`;
+                                                    }
+                                                }
+
+                                                if (canBuild && rules.evenBuild) {
+                                                    const currentHouses = boardState[activeModalSpaceId].houses;
+                                                    const countryProps = BOARD_SPACES.filter(s => s.country === space.country && s.id !== activeModalSpaceId);
+                                                    const canBuildEvenly = countryProps.every(s => {
+                                                        const st = boardState[s.id];
+                                                        return st && st.houses >= currentHouses;
+                                                    });
+                                                    if (!canBuildEvenly) {
+                                                        canBuild = false;
+                                                        failReason = "Must build evenly";
+                                                    }
+                                                }
+
+                                                return (
+                                                    <div className="flex flex-col gap-2 w-full mb-4">
+                                                        <button
+                                                            onClick={() => canBuild && buildHouse(players[currentTurn].id, activeModalSpaceId)}
+                                                            disabled={!canBuild}
+                                                            className={`w-full py-4 rounded-2xl font-black text-sm tracking-[0.2em] transition-all ${canBuild
+                                                                ? 'bg-[#8A58FF] text-white shadow-[0_10px_30px_rgba(138,88,255,0.2)] hover:bg-[#9E75FF] hover:scale-[1.02] active:scale-95 cursor-pointer'
+                                                                : 'bg-white/5 border border-white/10 text-slate-500 cursor-not-allowed'
+                                                                }`}
+                                                        >
+                                                            {canBuild ? `BUILD UPGRADE ($${space.housePrice})` : `CANNOT BUILD: ${failReason}`}
+                                                        </button>
+                                                        {rules.mortgageEnabled && bState.houses === 0 && (
+                                                            <button
+                                                                onClick={() => useGameStore.getState().mortgageProperty(player.id, activeModalSpaceId)}
+                                                                className="w-full py-3 rounded-2xl border border-rose-500/30 text-rose-500/80 hover:text-rose-400 hover:bg-rose-500/5 font-black text-xs tracking-[0.2em] transition-all"
+                                                            >
+                                                                MORTGAGE FOR ${Math.floor((space.price || 0) / 2)}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()
                                         ) : (
-                                            <div className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-slate-500 text-center text-xs font-black uppercase tracking-widest mb-4">
-                                                ASSET MAXED OUT
+                                            <div className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-slate-500 text-center text-xs font-black uppercase tracking-widest mb-4 flex flex-col gap-1">
+                                                <div className="text-[10px] opacity-60">Owned by</div>
+                                                <div className="text-white font-bold" style={{ color: players.find(p => p.id === boardState[activeModalSpaceId].ownerId)?.color }}>{players.find(p => p.id === boardState[activeModalSpaceId].ownerId)?.name || 'Another Player'}</div>
                                             </div>
                                         )}
                                         <div className="text-[9px] text-slate-500 font-bold uppercase tracking-tight italic">Increase your net worth and dominate the coast</div>
@@ -1019,6 +1604,79 @@ export const Board = () => {
                                         >
                                             ACKNOWLEDGE
                                         </button>
+                                    </motion.div>
+                                )}
+
+                                {activeAuction && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                        className="absolute z-[150] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1A1625]/95 backdrop-blur-3xl p-8 rounded-[2rem] border-2 border-amber-500/50 shadow-[0_0_100px_rgba(245,158,11,0.2)] w-96 flex flex-col items-center"
+                                    >
+                                        <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center mb-6 shadow-2xl">
+                                            <Gavel size={32} className="text-[#0A0810]" />
+                                        </div>
+                                        <div className="text-[10px] font-black uppercase tracking-[0.4em] text-amber-500 mb-2">Live Auction</div>
+                                        <h2 className="text-2xl font-black text-white mb-1">{BOARD_SPACES[activeAuction.spaceId].name}</h2>
+                                        <div className="text-xs font-bold text-slate-500 mb-8 uppercase tracking-widest">{BOARD_SPACES[activeAuction.spaceId].country || 'Global Asset'}</div>
+
+                                        <div className="w-full bg-black/40 rounded-2xl p-6 border border-white/5 mb-8 flex flex-col items-center">
+                                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Current Highest Bid</div>
+                                            <div className="text-4xl font-mono font-black text-amber-500 mb-4 animate-pulse">${activeAuction.currentBid}</div>
+                                            {activeAuction.highestBidderId ? (
+                                                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: players.find(p => p.id === activeAuction.highestBidderId)?.color }} />
+                                                    <span className="text-xs font-bold text-slate-300">{players.find(p => p.id === activeAuction.highestBidderId)?.name} is leading</span>
+                                                </div>
+                                            ) : (
+                                                <div className="text-[10px] font-bold text-slate-500 uppercase italic">Waiting for first bid...</div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex flex-col gap-4 w-full">
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="number"
+                                                    value={bidAmount || ''}
+                                                    onChange={e => setBidAmount(Number(e.target.value))}
+                                                    placeholder="Enter bid..."
+                                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-mono font-bold focus:border-amber-500/50 outline-none transition-all"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        placeBid(players[currentTurn].id, bidAmount);
+                                                        setBidAmount(0);
+                                                    }}
+                                                    disabled={bidAmount <= activeAuction.currentBid || bidAmount > players[currentTurn].money}
+                                                    className="px-6 rounded-xl bg-amber-500 text-[#0A0810] font-black text-xs tracking-widest hover:bg-amber-400 disabled:opacity-50 disabled:grayscale transition-all"
+                                                >
+                                                    BID
+                                                </button>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    onClick={() => placeBid(players[currentTurn].id, activeAuction.currentBid + 10)}
+                                                    className="py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[10px] font-black hover:bg-white/10 transition-all"
+                                                >
+                                                    +$10 FAST BID
+                                                </button>
+                                                <button
+                                                    onClick={() => placeBid(players[currentTurn].id, activeAuction.currentBid + 50)}
+                                                    className="py-3 rounded-xl bg-white/5 border border-white/10 text-white text-[10px] font-black hover:bg-white/10 transition-all"
+                                                >
+                                                    +$50 PRO BID
+                                                </button>
+                                            </div>
+
+                                            <button
+                                                onClick={() => endAuction()}
+                                                className="mt-4 w-full py-4 rounded-xl bg-emerald-600 text-white font-black text-sm tracking-[0.2em] shadow-xl hover:bg-emerald-500 transition-all border border-emerald-400/20"
+                                            >
+                                                HAMMER DOWN / END
+                                            </button>
+                                        </div>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -1201,11 +1859,11 @@ export const Board = () => {
                             <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Players</span>
                             <span className="text-xs text-[#CBB26A] font-bold bg-[#CBB26A]/10 px-2 py-1 rounded-md">{players.length} Playing</span>
                         </div>
-                        <div className="p-4 flex flex-col gap-3 flex-1 overflow-y-auto">
+                        <div className="p-4 flex flex-col gap-3 flex-1 overflow-y-auto border-b border-[#2A2438]">
                             {players.map((p, i) => (
                                 <motion.div layout key={p.id} className={`p-4 rounded-2xl flex items-center justify-between border transition-all ${currentTurn === i ? 'border-[#CBB26A] bg-[#2A2438] shadow-[0_0_15px_rgba(203,178,106,0.15)] scale-[1.02] z-10' : 'border-[#2A2438] bg-[#1D182E]'}`}>
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center shadow-[inset_0_2px_5px_rgba(0,0,0,0.5)]" style={{ backgroundColor: p.color }}>
+                                        <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center shadow-[inset_0_2px_5px_rgba(0,0,0,0.5)] bg-slate-800" style={{ backgroundColor: p.color }}>
                                             {/* Mini Eyes */}
                                             <div className="flex gap-1.5 opacity-90 mix-blend-overlay pointer-events-none">
                                                 <div className="w-2.5 h-2.5 bg-white rounded-full flex items-center justify-center"><div className="w-1 h-1 bg-black rounded-full" /></div>
@@ -1223,6 +1881,7 @@ export const Board = () => {
                                 </motion.div>
                             ))}
                         </div>
+
                         <div className="p-4 border-t border-[#2A2438] bg-[#120F1D]">
                             <button
                                 onClick={() => {
