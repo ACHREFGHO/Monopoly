@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore, BOARD_SPACES } from '../../store/useGameStore';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { ContactShadows, RoundedBox } from '@react-three/drei';
+import * as THREE from 'three';
+import { Car, Zap, Droplets, Plane, Play, Lock, Siren, Send, ArrowRight, Sparkles, ChevronLeft, ChevronRight, Coins, Palmtree, Gavel, Home, DollarSign, Shuffle, RefreshCw } from 'lucide-react';
+import { useTexture } from '@react-three/drei';
 
 const getGridArea = (id: number) => {
     if (id === 0) return { gridRow: 1, gridColumn: 1 };
@@ -14,128 +19,177 @@ const getGridArea = (id: number) => {
     return { gridRow: 1, gridColumn: 1 };
 };
 
-import { Canvas, useFrame } from '@react-three/fiber';
-import { ContactShadows, RoundedBox } from '@react-three/drei';
-import * as THREE from 'three';
+// ============================================================
+// BEAUTIFUL SVG TOKEN COMPONENT
+// ============================================================
+const TOKEN_SHAPES: Record<string, (color: string, size: number) => React.ReactNode> = {
+    sphere: (color, s) => (
+        <svg width={s} height={s} viewBox="0 0 40 40" fill="none">
+            <defs>
+                <radialGradient id={`sg-${color}`} cx="35%" cy="30%" r="60%">
+                    <stop offset="0%" stopColor="#fff" stopOpacity="0.9" />
+                    <stop offset="40%" stopColor={color} stopOpacity="1" />
+                    <stop offset="100%" stopColor={color} stopOpacity="0.5" />
+                </radialGradient>
+            </defs>
+            <circle cx="20" cy="20" r="17" fill={`url(#sg-${color})`} />
+            <ellipse cx="14" cy="14" rx="5" ry="4" fill="white" opacity="0.35" transform="rotate(-20,14,14)" />
+        </svg>
+    ),
+    cube: (color, s) => (
+        <svg width={s} height={s} viewBox="0 0 40 40" fill="none">
+            <defs>
+                <linearGradient id={`cg-${color}`} x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity="1" />
+                    <stop offset="100%" stopColor={color} stopOpacity="0.4" />
+                </linearGradient>
+            </defs>
+            <polygon points="20,5 35,13 35,27 20,35 5,27 5,13" fill={`url(#cg-${color})`} stroke={color} strokeWidth="1" />
+            <polygon points="20,5 35,13 20,21 5,13" fill={color} opacity="0.7" />
+            <polygon points="20,21 35,13 35,27 20,35" fill={color} opacity="0.4" />
+            <ellipse cx="14" cy="10" rx="3" ry="2" fill="white" opacity="0.4" transform="rotate(-30,14,10)" />
+        </svg>
+    ),
+    cylinder: (color, s) => (
+        <svg width={s} height={s} viewBox="0 0 40 40" fill="none">
+            <defs>
+                <linearGradient id={`cyg-${color}`} x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor={color} stopOpacity="0.5" />
+                    <stop offset="40%" stopColor={color} stopOpacity="1" />
+                    <stop offset="100%" stopColor={color} stopOpacity="0.4" />
+                </linearGradient>
+            </defs>
+            <rect x="8" y="14" width="24" height="18" rx="2" fill={`url(#cyg-${color})`} />
+            <ellipse cx="20" cy="14" rx="12" ry="5" fill={color} />
+            <ellipse cx="20" cy="14" rx="7" ry="2.5" fill="white" opacity="0.3" />
+            <ellipse cx="20" cy="32" rx="12" ry="5" fill={color} opacity="0.6" />
+        </svg>
+    ),
+    car: (color, s) => (
+        <svg width={s} height={s} viewBox="0 0 40 40" fill="none">
+            <defs>
+                <linearGradient id={`carg-${color}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} />
+                    <stop offset="100%" stopColor={color} stopOpacity="0.6" />
+                </linearGradient>
+            </defs>
+            <rect x="4" y="22" width="32" height="10" rx="3" fill={`url(#carg-${color})`} />
+            <rect x="9" y="14" width="22" height="10" rx="4" fill={color} />
+            <rect x="11" y="15" width="8" height="6" rx="2" fill="#a0d8ef" opacity="0.8" />
+            <rect x="21" y="15" width="8" height="6" rx="2" fill="#a0d8ef" opacity="0.8" />
+            <circle cx="11" cy="32" r="4" fill="#222" />
+            <circle cx="29" cy="32" r="4" fill="#222" />
+            <circle cx="11" cy="32" r="2" fill="#555" />
+            <circle cx="29" cy="32" r="2" fill="#555" />
+            <rect x="3" y="24" width="4" height="3" rx="1" fill="#fff" opacity="0.8" />
+            <rect x="33" y="24" width="4" height="3" rx="1" fill="#ff4444" opacity="0.8" />
+        </svg>
+    ),
+    horse: (color, s) => (
+        <svg width={s} height={s} viewBox="0 0 40 40" fill="none">
+            <defs>
+                <radialGradient id={`hg-${color}`} cx="50%" cy="30%" r="70%">
+                    <stop offset="0%" stopColor={color} />
+                    <stop offset="100%" stopColor={color} stopOpacity="0.5" />
+                </radialGradient>
+            </defs>
+            <ellipse cx="20" cy="28" rx="10" ry="6" fill={`url(#hg-${color})`} />
+            <rect x="15" y="18" width="10" height="14" rx="3" fill={color} />
+            <ellipse cx="22" cy="14" rx="8" ry="7" fill={color} />
+            <path d="M26 10 Q32 6 30 4 Q28 8 26 10" fill={color} />
+            <circle cx="19" cy="12" r="1.5" fill="#111" />
+            <ellipse cx="18" cy="10" rx="2" ry="1" fill="white" opacity="0.3" />
+            <rect x="14" y="30" width="3" height="7" rx="1.5" fill={color} opacity="0.8" />
+            <rect x="23" y="30" width="3" height="7" rx="1.5" fill={color} opacity="0.8" />
+        </svg>
+    ),
+    hat: (color, s) => (
+        <svg width={s} height={s} viewBox="0 0 40 40" fill="none">
+            <defs>
+                <linearGradient id={`hatg-${color}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} />
+                    <stop offset="100%" stopColor={color} stopOpacity="0.6" />
+                </linearGradient>
+            </defs>
+            <ellipse cx="20" cy="32" rx="16" ry="5" fill={`url(#hatg-${color})`} />
+            <rect x="13" y="10" width="14" height="23" rx="2" fill={color} />
+            <ellipse cx="20" cy="10" rx="7" ry="2.5" fill={color} />
+            <rect x="14" y="21" width="12" height="2.5" fill="white" opacity="0.25" />
+            <ellipse cx="17" cy="12" rx="3" ry="1.5" fill="white" opacity="0.3" />
+        </svg>
+    ),
+    ship: (color, s) => (
+        <svg width={s} height={s} viewBox="0 0 40 40" fill="none">
+            <defs>
+                <linearGradient id={`shipg-${color}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} />
+                    <stop offset="100%" stopColor={color} stopOpacity="0.5" />
+                </linearGradient>
+            </defs>
+            <path d="M5 28 Q20 36 35 28 L30 20 Q20 24 10 20 Z" fill={`url(#shipg-${color})`} />
+            <rect x="18" y="10" width="3" height="13" rx="1" fill={color} />
+            <path d="M21 10 L30 18 L21 18 Z" fill={color} opacity="0.7" />
+            <ellipse cx="14" cy="22" rx="3" ry="1.5" fill="white" opacity="0.3" />
+        </svg>
+    ),
+    cone: (color, s) => (
+        <svg width={s} height={s} viewBox="0 0 40 40" fill="none">
+            <defs>
+                <linearGradient id={`coneg-${color}`} x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor={color} />
+                    <stop offset="100%" stopColor={color} stopOpacity="0.4" />
+                </linearGradient>
+            </defs>
+            <path d="M20 5 L35 33 Q20 38 5 33 Z" fill={`url(#coneg-${color})`} />
+            <ellipse cx="20" cy="33" rx="15" ry="5" fill={color} opacity="0.7" />
+            <path d="M20 5 L27 22" stroke="white" strokeWidth="1" opacity="0.2" strokeLinecap="round" />
+            <ellipse cx="16" cy="14" rx="3" ry="4" fill="white" opacity="0.15" transform="rotate(-20,16,14)" />
+        </svg>
+    ),
+};
 
-import { Car, Zap, Droplets, Plane, AlertTriangle, Play, Lock, Siren, Send } from 'lucide-react';
-
-const Token3D = ({ color, shape }: { color: string, shape?: string }) => {
-    const meshRef = React.useRef<THREE.Group>(null);
-    useFrame((state) => {
-        if (meshRef.current) {
-            meshRef.current.rotation.y = state.clock.getElapsedTime() * 0.5;
-            meshRef.current.position.y = Math.sin(state.clock.getElapsedTime() * 2) * 0.1;
-        }
-    });
-
-    const materialProps = {
-        color: color,
-        metalness: 0.7,
-        roughness: 0.2,
-        envMapIntensity: 2
-    };
-
+const PlayerToken = ({ color, shape, size = 36, isActive = false }: { color: string; shape: string; size?: number; isActive?: boolean }) => {
+    const svgFn = TOKEN_SHAPES[shape] || TOKEN_SHAPES['sphere'];
     return (
-        <group ref={meshRef} scale={1.5}>
-            {shape === 'cube' && (
-                <mesh castShadow receiveShadow>
-                    <boxGeometry args={[1, 1, 1]} />
-                    <meshStandardMaterial {...materialProps} />
-                </mesh>
-            )}
-            {shape === 'sphere' && (
-                <mesh castShadow receiveShadow>
-                    <sphereGeometry args={[0.7, 32, 32]} />
-                    <meshStandardMaterial {...materialProps} />
-                </mesh>
-            )}
-            {shape === 'car' && (
-                <group>
-                    <mesh castShadow receiveShadow position={[0, 0.2, 0]}>
-                        <boxGeometry args={[1.2, 0.6, 2.2]} />
-                        <meshStandardMaterial {...materialProps} />
-                    </mesh>
-                    <mesh castShadow position={[0, 0.7, -0.2]}>
-                        <boxGeometry args={[1, 0.5, 1]} />
-                        <meshStandardMaterial {...materialProps} />
-                    </mesh>
-                </group>
-            )}
-            {shape === 'horse' && (
-                <group scale={0.8} position={[0, -0.2, 0]}>
-                    <mesh castShadow position={[0, 0, 0]}>
-                        <cylinderGeometry args={[0.6, 0.8, 0.4, 16]} />
-                        <meshStandardMaterial {...materialProps} />
-                    </mesh>
-                    <mesh castShadow position={[0, 0.8, 0]} rotation={[0.4, 0, 0]}>
-                        <boxGeometry args={[0.4, 1.4, 0.5]} />
-                        <meshStandardMaterial {...materialProps} />
-                    </mesh>
-                    <mesh castShadow position={[0, 1.4, 0.3]} rotation={[-0.2, 0, 0]}>
-                        <boxGeometry args={[0.4, 0.5, 0.8]} />
-                        <meshStandardMaterial {...materialProps} />
-                    </mesh>
-                </group>
-            )}
-            {shape === 'hat' && (
-                <group scale={0.8} position={[0, -0.2, 0]}>
-                    <mesh castShadow position={[0, 0, 0]}>
-                        <cylinderGeometry args={[0.9, 0.9, 0.15, 32]} />
-                        <meshStandardMaterial {...materialProps} />
-                    </mesh>
-                    <mesh castShadow position={[0, 0.6, 0]}>
-                        <cylinderGeometry args={[0.6, 0.6, 1.2, 32]} />
-                        <meshStandardMaterial {...materialProps} />
-                    </mesh>
-                </group>
-            )}
-            {shape === 'ship' && (
-                <group rotation={[0, Math.PI, 0]} scale={0.8}>
-                    <mesh castShadow rotation={[0, 0, Math.PI]} scale={[1, 0.4, 1.2]}>
-                        <coneGeometry args={[0.8, 2.5, 3]} />
-                        <meshStandardMaterial {...materialProps} />
-                    </mesh>
-                    <mesh castShadow position={[0, 0.6, 0.2]}>
-                        <boxGeometry args={[0.2, 1, 0.2]} />
-                        <meshStandardMaterial {...materialProps} />
-                    </mesh>
-                </group>
-            )}
-            {(shape === 'cylinder' || !shape) && (
-                <mesh castShadow receiveShadow>
-                    <cylinderGeometry args={[0.5, 0.7, 1.5, 32]} />
-                    <meshStandardMaterial {...materialProps} />
-                </mesh>
-            )}
-            {shape === 'cone' && (
-                <mesh castShadow receiveShadow>
-                    <coneGeometry args={[0.7, 1.5, 32]} />
-                    <meshStandardMaterial {...materialProps} />
-                </mesh>
-            )}
-            <ContactShadows position={[0, -0.8, 0]} opacity={0.6} scale={4} blur={2.5} far={1.5} />
-        </group>
+        <motion.div
+            animate={isActive ? { y: [0, -5, 0] } : {}}
+            transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+            style={{ filter: `drop-shadow(0 6px 12px ${color}88) drop-shadow(0 0 20px ${color}44)` }}
+        >
+            {svgFn(color, size)}
+        </motion.div>
     );
 };
 
-const DicePip = ({ position }: { position: [number, number, number] }) => (
-    <mesh position={position}>
-        <sphereGeometry args={[0.16, 16, 16]} />
-        <meshStandardMaterial color="#111" roughness={0.8} />
-    </mesh>
+const Token3D = ({ color, shape }: { color: string, shape?: string }) => (
+    <PlayerToken color={color} shape={shape || 'sphere'} size={80} />
 );
+
 
 const Dice3D = ({ value, rolling }: { value: number, rolling: boolean }) => {
     const meshRef = React.useRef<THREE.Group>(null);
+    const { dicePreference } = useGameStore();
+
+    // Determine path based on preference
+    const prefix = dicePreference === 'red' ? 'dieRed_border' : 'dieWhite_border';
+
+    // Load all 6 textures
+    const textures = useTexture([
+        `/Dice/${prefix}1.png`,
+        `/Dice/${prefix}2.png`,
+        `/Dice/${prefix}3.png`,
+        `/Dice/${prefix}4.png`,
+        `/Dice/${prefix}5.png`,
+        `/Dice/${prefix}6.png`,
+    ]);
 
     const targetRotations: Record<number, [number, number, number]> = {
-        1: [-Math.PI / 2, 0, 0],
-        2: [0, 0, Math.PI / 2],
-        3: [0, 0, 0],
-        4: [Math.PI, 0, 0],
-        5: [0, 0, -Math.PI / 2],
-        6: [Math.PI / 2, 0, 0],
+        1: [-Math.PI / 2, 0, 0],   // Top (Face 1)
+        2: [0, 0, Math.PI / 2],    // Side (Face 2)
+        3: [0, 0, 0],               // Front (Face 3)
+        4: [Math.PI, 0, 0],        // Back (Face 4)
+        5: [0, 0, -Math.PI / 2],   // Side (Face 5)
+        6: [Math.PI / 2, 0, 0],    // Bottom (Face 6)
     };
 
     useFrame((state, delta) => {
@@ -153,49 +207,53 @@ const Dice3D = ({ value, rolling }: { value: number, rolling: boolean }) => {
         }
     });
 
-    const d = 0.4;
-    const offset = 0.73;
-
+    // Face mapping for BoxGeometry: 
+    // 0: +X, 1: -X, 2: +Y, 3: -Y, 4: +Z, 5: -Z
+    // Corrected mapping based on targetRotations:
     return (
         <group ref={meshRef}>
-            <RoundedBox args={[1.5, 1.5, 1.5]} radius={0.15} smoothness={4} castShadow receiveShadow>
-                <meshStandardMaterial color="#f0f2f5" roughness={0.3} metalness={0.1} />
-            </RoundedBox>
-
-            <DicePip position={[0, 0, offset]} />
-
-            <DicePip position={[-d, -d, -offset]} />
-            <DicePip position={[-d, 0, -offset]} />
-            <DicePip position={[-d, d, -offset]} />
-            <DicePip position={[d, -d, -offset]} />
-            <DicePip position={[d, 0, -offset]} />
-            <DicePip position={[d, d, -offset]} />
-
-            <DicePip position={[offset, -d, -d]} />
-            <DicePip position={[offset, d, d]} />
-
-            <DicePip position={[-offset, -d, -d]} />
-            <DicePip position={[-offset, d, d]} />
-            <DicePip position={[-offset, 0, 0]} />
-            <DicePip position={[-offset, -d, d]} />
-            <DicePip position={[-offset, d, -d]} />
-
-            <DicePip position={[-d, offset, -d]} />
-            <DicePip position={[0, offset, 0]} />
-            <DicePip position={[d, offset, d]} />
-
-            <DicePip position={[-d, -offset, -d]} />
-            <DicePip position={[-d, -offset, d]} />
-            <DicePip position={[d, -offset, -d]} />
-            <DicePip position={[d, -offset, d]} />
+            <mesh castShadow receiveShadow>
+                <boxGeometry args={[1.5, 1.5, 1.5]} />
+                {/* Order: px, nx, py, ny, pz, nz */}
+                <meshStandardMaterial attach="material-0" map={textures[1]} /> {/* +X = 2 */}
+                <meshStandardMaterial attach="material-1" map={textures[4]} /> {/* -X = 5 */}
+                <meshStandardMaterial attach="material-2" map={textures[2]} /> {/* +Y = 3 */}
+                <meshStandardMaterial attach="material-3" map={textures[3]} /> {/* -Y = 4 */}
+                <meshStandardMaterial attach="material-4" map={textures[0]} /> {/* +Z = 1 */}
+                <meshStandardMaterial attach="material-5" map={textures[5]} /> {/* -Z = 6 */}
+            </mesh>
         </group>
     );
 };
 
+const RuleToggle = ({ icon: Icon, title, description, value, onChange }: { icon: any, title: string, description: string, value: boolean, onChange: (v: boolean) => void }) => (
+    <div className="flex items-center gap-4 px-5 py-4 group hover:bg-white/[0.02] transition-colors">
+        <div className="w-12 h-12 rounded-2xl bg-[#1A1625] border border-white/5 flex items-center justify-center text-slate-400 group-hover:bg-[#CBB26A]/10 group-hover:text-[#CBB26A] transition-colors shrink-0 shadow-lg">
+            <Icon size={20} />
+        </div>
+        <div className="flex-1 flex flex-col min-w-0">
+            <span className="text-[14px] font-black text-white mb-0.5 tracking-tight">{title}</span>
+            <span className="text-[11px] text-slate-500 font-bold leading-tight line-clamp-2 tracking-wide">{description}</span>
+        </div>
+        <button
+            onClick={() => onChange(!value)}
+            className={`w-14 h-7 rounded-full relative transition-all duration-500 shrink-0 ${value ? 'bg-[#CBB26A]' : 'bg-[#1A1625] border border-white/10'}`}
+        >
+            <motion.div
+                animate={{ x: value ? 28 : 4 }}
+                initial={false}
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                className="absolute top-1 w-5 h-5 rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
+            />
+        </button>
+    </div>
+);
+
 export const Board = () => {
-    const { players, currentTurn, boardState, rollDice, endTurn, diceRoll, activeCard, activeTrade, hasRolled, respondToTrade, proposeTrade, chatMessages, sendMessage, activeModalSpaceId, setActiveModalSpaceId, buyProperty, isMoving } = useGameStore();
+    const { players, currentTurn, boardState, rollDice, endTurn, diceRoll, activeCard, activeTrade, hasRolled, respondToTrade, proposeTrade, chatMessages, sendMessage, activeModalSpaceId, setActiveModalSpaceId, buyProperty, isMoving, dicePreference, setDicePreference, monopolyRequiredToBuild, setMonopolyRequiredToBuild, buildHouse, rules, setRule, postBail } = useGameStore();
     const [isRolling, setIsRolling] = useState(false);
     const [hoveredSpaceId, setHoveredSpaceId] = useState<number | null>(null);
+    const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatInput, setChatInput] = useState('');
     const chatEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -335,15 +393,16 @@ export const Board = () => {
                                 </div>
                             </div>
 
-                            {/* Preview Area for Item Shaper */}
-                            <div className="w-full h-40 bg-[#0E0B16] rounded-2xl border border-[#2A2438] relative overflow-hidden group shadow-inner">
+                            {/* Preview Area for Token */}
+                            <div className="w-full h-40 bg-[#0E0B16] rounded-2xl border border-[#2A2438] relative overflow-hidden shadow-inner flex flex-col items-center justify-center gap-3">
                                 <div className="absolute top-2 left-3 text-[9px] uppercase font-bold text-slate-600 tracking-widest z-10">Preview</div>
-                                <Canvas camera={{ position: [0, 2, 5], fov: 35 }}>
-                                    <ambientLight intensity={0.6} />
-                                    <pointLight position={[10, 10, 10]} intensity={1.2} />
-                                    <Token3D color={newPlayerColor} shape={newPlayerShape} />
-                                </Canvas>
-                                <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[#0E0B16] to-transparent pointer-events-none" />
+                                <PlayerToken color={newPlayerColor} shape={newPlayerShape} size={80} isActive />
+                                <div
+                                    className="text-[10px] font-black uppercase tracking-widest"
+                                    style={{ color: newPlayerColor, textShadow: `0 0 20px ${newPlayerColor}88` }}
+                                >
+                                    {newPlayerShape}
+                                </div>
                             </div>
 
                             <button onClick={handleAddPlayer} disabled={tempPlayers.length >= 8} className="w-full bg-[#CBB26A] hover:bg-[#B19859] text-[#0E0B16] py-4 rounded-xl font-black transition-all active:scale-[0.98] shadow-lg shadow-[#CBB26A]/20 flex items-center justify-center gap-2 group">
@@ -352,75 +411,32 @@ export const Board = () => {
                         </div>
                     </div>
                 ) : (
-                    /* ACTIVE GAME SIDEBAR CONTENT */
-                    <>
-                        <div className="px-4 mb-4">
-                            <div className="bg-[#0E0B16] p-4 rounded-xl border border-[#2A2438]">
-                                <div className="text-xs text-slate-400 font-bold mb-3">Share this game</div>
-                                <div className="flex gap-2">
-                                    <input type="text" readOnly value="Local Play Only" className="bg-[#171324] border border-[#2A2438] rounded-lg outline-none text-[11px] w-full px-3 text-slate-300 font-mono" />
-                                    <button className="bg-[#2A2438] hover:bg-[#3B3450] text-xs px-3 py-2 rounded-lg transition-colors font-bold whitespace-nowrap text-white" title="Copy">
-                                        Copy
+                    /* ACTIVE GAME SIDEBAR CONTENT - SIMPLIFIED */
+                    <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
+                        <div className="bg-[#0E0B16] p-5 rounded-2xl border border-[#2A2438] shadow-xl">
+                            <div className="text-[10px] text-[#CBB26A] font-black uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#CBB26A]" />
+                                Game Information
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Mode</span>
+                                    <span className="text-xs text-white font-black">Local Multiplayer</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Game Status</span>
+                                    <span className="text-xs text-emerald-400 font-black animate-pulse">Running</span>
+                                </div>
+                                <div className="pt-2">
+                                    <button className="w-full bg-white/5 hover:bg-white/10 text-slate-300 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all">
+                                        View Log
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex-1 flex flex-col mx-4 mb-4 bg-[#0E0B16] rounded-xl border border-white/5 overflow-hidden flex-shrink-0 min-h-0 shadow-2xl">
-                            <div className="px-5 py-3 border-b border-white/5 bg-white/5 flex items-center justify-between">
-                                <span className="text-xs font-black uppercase tracking-[0.2em] text-[#CBB26A]">Crew Chat</span>
-                                <div className="flex gap-1">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                                    <span className="text-[10px] text-slate-500 font-bold uppercase">Live</span>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 custom-scrollbar bg-[#0A0810]/50">
-                                {chatMessages.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center opacity-20 select-none">
-                                        <div className="text-3xl mb-2">💬</div>
-                                        <div className="text-[10px] font-black uppercase tracking-widest">No messages yet</div>
-                                    </div>
-                                ) : (
-                                    chatMessages.map(msg => (
-                                        <div key={msg.id} className="flex flex-col group">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: msg.senderColor }} />
-                                                <span className="text-[10px] font-black text-white/50 uppercase tracking-tighter">{msg.senderName}</span>
-                                                <span className="text-[8px] text-white/20 font-mono ml-auto">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                            </div>
-                                            <div className="bg-white/5 rounded-2xl rounded-tl-none px-3 py-2 text-xs text-slate-200 border border-white/5 group-hover:bg-white/10 transition-colors">
-                                                {msg.text}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                                <div ref={chatEndRef} />
-                            </div>
-
-                            <div className="p-3 bg-[#0E0B16] border-t border-white/5">
-                                <form
-                                    onSubmit={(e) => { e.preventDefault(); handleSendChat(); }}
-                                    className="relative flex items-center bg-white/5 rounded-xl border border-white/10 focus-within:border-[#CBB26A]/50 transition-all p-1"
-                                >
-                                    <input
-                                        type="text"
-                                        value={chatInput}
-                                        onChange={(e) => setChatInput(e.target.value)}
-                                        placeholder="Send a message..."
-                                        className="flex-1 bg-transparent py-2 pl-3 pr-10 text-xs text-white outline-none placeholder:text-slate-600 font-medium"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={!chatInput.trim()}
-                                        className="absolute right-1 w-8 h-8 rounded-lg bg-[#CBB26A] text-[#0A0810] flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:grayscale disabled:hover:scale-100"
-                                    >
-                                        <Send size={14} />
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </>
+                        {/* Quick controls could go here or additional stats */}
+                    </div>
                 )}
             </div>
 
@@ -449,7 +465,9 @@ export const Board = () => {
                             else if (id > 20 && id < 30) edge = 'bottom';
                             else if (id > 30 && id < 40) edge = 'left';
 
-                            // Perimeter logic: components always sit at the board's outer boundary
+                            // Inner edge = opposite of the outer edge (faces board center)
+                            const innerEdge = edge === 'top' ? 'bottom' : edge === 'bottom' ? 'top' : edge === 'left' ? 'right' : 'left';
+
                             return (
                                 <motion.div
                                     key={id}
@@ -460,72 +478,161 @@ export const Board = () => {
                                         zIndex: 40,
                                         boxShadow: "0 20px 40px rgba(0,0,0,0.5)"
                                     }}
-                                    className="relative flex flex-col items-center justify-center bg-[#1E1B2E] rounded-2xl overflow-hidden transition-all duration-300 border border-white/5 group/space shadow-xl cursor-pointer"
-                                    style={{ gridRow, gridColumn }}
+                                    className="relative flex flex-col items-center justify-center overflow-hidden transition-all duration-200 border cursor-pointer group/space"
+                                    style={{
+                                        gridRow,
+                                        gridColumn,
+                                        background: isCorner
+                                            ? 'linear-gradient(145deg, #1a1535 0%, #0d0a1a 100%)'
+                                            : space.type === 'chance'
+                                                ? 'linear-gradient(145deg, #2a1535 0%, #150a22 100%)'
+                                                : space.type === 'chest'
+                                                    ? 'linear-gradient(145deg, #102030 0%, #060e18 100%)'
+                                                    : space.type === 'tax'
+                                                        ? 'linear-gradient(145deg, #251010 0%, #120505 100%)'
+                                                        : space.type === 'station'
+                                                            ? 'linear-gradient(145deg, #1a1a2e 0%, #0a0a18 100%)'
+                                                            : space.type === 'utility'
+                                                                ? 'linear-gradient(145deg, #101828 0%, #060d18 100%)'
+                                                                : 'linear-gradient(145deg, #181530 0%, #0c0a1e 100%)',
+                                        borderColor: bState?.ownerId
+                                            ? (players.find(p => p.id === bState.ownerId)?.color || 'rgba(255,255,255,0.1)')
+                                            : hoveredSpaceId === id
+                                                ? 'rgba(203,178,106,0.5)'
+                                                : 'rgba(255,255,255,0.06)',
+                                        borderWidth: bState?.ownerId ? '2px' : '1px',
+                                        borderRadius: isCorner ? '14px' : '10px',
+                                        boxShadow: bState?.ownerId
+                                            ? `0 0 18px ${players.find(p => p.id === bState.ownerId)?.color}55`
+                                            : 'none',
+                                    }}
                                 >
-                                    {/* Property Color Header - Always at Perimeter */}
+                                    {/* Property Color Band — on INNER side (facing board center) */}
                                     {space.type === 'property' && space.color && (
                                         <div
-                                            className="absolute z-0 shadow-sm"
+                                            className="absolute z-10 flex items-center justify-center overflow-hidden"
                                             style={{
-                                                ... (edge === 'top' ? { top: 0, left: 0, right: 0, height: '18px' } : {}),
-                                                ... (edge === 'bottom' ? { bottom: 0, left: 0, right: 0, height: '18px' } : {}),
-                                                ... (edge === 'left' ? { left: 0, top: 0, bottom: 0, width: '18px' } : {}),
-                                                ... (edge === 'right' ? { right: 0, top: 0, bottom: 0, width: '18px' } : {}),
+                                                ...(innerEdge === 'top' ? { top: 0, left: 0, right: 0, height: '22px' } : {}),
+                                                ...(innerEdge === 'bottom' ? { bottom: 0, left: 0, right: 0, height: '22px' } : {}),
+                                                ...(innerEdge === 'left' ? { left: 0, top: 0, bottom: 0, width: '22px' } : {}),
+                                                ...(innerEdge === 'right' ? { right: 0, top: 0, bottom: 0, width: '22px' } : {}),
                                                 background: space.color,
-                                            }}
-                                        />
-                                    )}
-
-                                    {/* Price Badge - Flush tab on Perimeter */}
-                                    {(space.price || space.type === 'tax') && (
-                                        <div
-                                            className="absolute z-30 bg-white rounded shadow-lg px-2 py-0.5 border border-gray-100"
-                                            style={{
-                                                ... (edge === 'top' ? { top: '6px', left: '50%', transform: 'translateX(-50%)' } : {}),
-                                                ... (edge === 'bottom' ? { bottom: '6px', left: '50%', transform: 'translateX(-50%)' } : {}),
-                                                ... (edge === 'left' ? { left: '6px', top: '50%', transform: 'translateX(-50%)' } : {}),
-                                                ... (edge === 'right' ? { right: '6px', top: '50%', transform: 'translateX(-50%)' } : {}),
+                                                boxShadow: `0 0 14px ${space.color}88`,
+                                                writingMode: (innerEdge === 'left' || innerEdge === 'right') ? 'vertical-rl' : 'horizontal-tb',
                                             }}
                                         >
-                                            <span className="font-mono font-black text-[#1E1B2E] text-[10px] leading-none whitespace-nowrap">
+                                            {/* House/Hotel indicator on the color band */}
+                                            {bState?.houses > 0 && (
+                                                <div className="flex gap-0.5 pointer-events-none items-center justify-center w-full h-full">
+                                                    {bState.houses < 5 ? (
+                                                        Array.from({ length: bState.houses }).map((_, i) => (
+                                                            <div key={i} className="text-[10px] leading-none drop-shadow-md">🏠</div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="text-[11px] leading-none drop-shadow-[0_0_8px_white]">💎</div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <span
+                                                className="font-black leading-none whitespace-nowrap select-none"
+                                                style={{
+                                                    fontSize: '9px',
+                                                    fontFamily: 'JetBrains Mono, monospace',
+                                                    color: '#fff',
+                                                    textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7)',
+                                                    transform: innerEdge === 'left' ? 'rotate(180deg)' : 'none',
+                                                    letterSpacing: '0.02em',
+                                                }}
+                                            >
+                                                {space.price}$
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Price for non-property tiles (tax, utility, station) */}
+                                    {space.type !== 'property' && (space.price || space.type === 'tax') && !isCorner && (
+                                        <div className="absolute z-20 bottom-1 left-1/2 -translate-x-1/2">
+                                            <span
+                                                className="font-black text-[#CBB26A] leading-none whitespace-nowrap"
+                                                style={{ fontSize: '8px', fontFamily: 'JetBrains Mono, monospace', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}
+                                            >
                                                 {space.type === 'tax' ? (id === 4 ? '10%' : `${space.price}$`) : `${space.price}$`}
                                             </span>
                                         </div>
                                     )}
 
-                                    {/* Inner Content - Buffered by perimeter edge */}
+                                    {/* Inner Content */}
                                     <div
                                         className={`flex flex-col items-center justify-center w-full h-full relative z-10
-                                        ${edge === 'top' ? 'pt-8 pb-1' : edge === 'bottom' ? 'pb-8 pt-1' :
-                                                edge === 'left' ? 'pl-8 pr-1' : 'pr-8 pl-1'}`}
+                                        ${space.type === 'property' ?
+                                                (innerEdge === 'top' ? 'pt-5 pb-1' : innerEdge === 'bottom' ? 'pb-5 pt-1' :
+                                                    innerEdge === 'left' ? 'pl-5 pr-1' : 'pr-5 pl-1')
+                                                : 'p-1'}`}
                                     >
-                                        <div className="flex flex-col items-center justify-center w-full">
-                                            {isCorner && id === 0 && <div className="text-xl sm:text-2xl mb-1">🚩</div>}
-                                            {isCorner && id === 10 && <Lock size={22} className="text-rose-500 mb-1" />}
-                                            {isCorner && id === 20 && <div className="text-xl sm:text-2xl mb-1">🌴</div>}
-                                            {isCorner && id === 30 && <Siren size={22} className="text-amber-500 mb-1" />}
-                                            {!isCorner && space.type === 'station' && <Plane size={18} className="text-white mb-1" />}
-                                            {!isCorner && space.type === 'utility' && id === 12 && <Zap size={18} className="text-yellow-400 mb-1" fill="currentColor" fillOpacity={0.2} />}
-                                            {!isCorner && space.type === 'utility' && id === 28 && <Droplets size={18} className="text-blue-400 mb-1" fill="currentColor" fillOpacity={0.2} />}
-                                            {!isCorner && space.type === 'tax' && <div className="text-xl mb-1">💸</div>}
-                                            {space.type === 'chance' && <div className="text-3xl font-black text-rose-500 mb-1">?</div>}
-                                            {space.type === 'chest' && <div className="text-3xl mb-1">🎁</div>}
+                                        <div className="flex flex-col items-center justify-center w-full gap-0.5">
+                                            {/* Corner tiles */}
+                                            {isCorner && id === 0 && <div className="text-2xl sm:text-3xl">🚩</div>}
+                                            {isCorner && id === 10 && (
+                                                <div className="flex flex-col items-center">
+                                                    <Lock size={22} className="text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.7)]" />
+                                                    <div className="text-[6px] font-black text-rose-300/40 uppercase tracking-tighter mt-1">Visit / InJail</div>
+                                                </div>
+                                            )}
+                                            {isCorner && id === 20 && <div className="text-2xl sm:text-3xl">🌴</div>}
+                                            {isCorner && id === 30 && (
+                                                <div className="flex flex-col items-center">
+                                                    <Siren size={24} className="text-amber-500 animate-pulse drop-shadow-[0_0_12px_#fbbf24aa]" />
+                                                    <div className="text-[6px] font-black text-amber-300/40 uppercase tracking-tighter mt-1">Intercepted</div>
+                                                </div>
+                                            )}
 
-                                            <span className={`font-black text-white leading-tight text-center w-full px-1
-                                                ${isCorner ? 'text-[10px] sm:text-[11px] md:text-[12px] uppercase' : 'text-[8.5px] sm:text-[9.5px]'}
-                                                max-w-full whitespace-pre-wrap break-words`}
-                                                style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
+                                            {/* Station */}
+                                            {!isCorner && space.type === 'station' && (
+                                                <div className="text-xl sm:text-2xl leading-none">✈️</div>
+                                            )}
+
+                                            {/* Utility */}
+                                            {!isCorner && space.type === 'utility' && id === 12 && (
+                                                <Zap size={16} className="text-yellow-300 drop-shadow-[0_0_8px_rgba(253,224,71,0.8)]" fill="currentColor" />
+                                            )}
+                                            {!isCorner && space.type === 'utility' && id === 28 && (
+                                                <Droplets size={16} className="text-blue-300 drop-shadow-[0_0_8px_rgba(147,197,253,0.8)]" fill="currentColor" />
+                                            )}
+
+                                            {/* Tax */}
+                                            {!isCorner && space.type === 'tax' && (
+                                                <div className="text-xl leading-none">💸</div>
+                                            )}
+
+                                            {/* Chance */}
+                                            {space.type === 'chance' && (
+                                                <div
+                                                    className="text-xl font-black leading-none"
+                                                    style={{ color: '#e879a0', textShadow: '0 0 12px #e879a0aa, 0 0 24px #e879a044' }}
+                                                >?</div>
+                                            )}
+
+                                            {/* Community Chest */}
+                                            {space.type === 'chest' && (
+                                                <div className="text-xl leading-none">🎁</div>
+                                            )}
+
+                                            <span
+                                                className={`font-bold text-center w-full px-0.5 leading-tight
+                                                    ${isCorner ? 'text-[9px] sm:text-[10px] uppercase tracking-tight text-slate-200' : 'text-[7px] sm:text-[8px] text-slate-300'}
+                                                    max-w-full whitespace-pre-wrap break-words`}
+                                                style={{ textShadow: '0 1px 4px rgba(0,0,0,1)' }}
                                             >
                                                 {isCorner ? space.name.split(' ').join('\n') : space.name}
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Ownership marker */}
-                                    {bState?.ownerId && (
-                                        <div className="absolute inset-0 border-[3px] rounded-2xl opacity-80 pointer-events-none z-20" style={{ borderColor: players.find(p => p.id === bState.ownerId)?.color || 'white' }} />
-                                    )}
+                                    {/* Active glow overlay on hover */}
+                                    <div
+                                        className="absolute inset-0 rounded-[inherit] opacity-0 group-hover/space:opacity-100 pointer-events-none transition-opacity duration-300"
+                                        style={{ background: 'radial-gradient(circle at center, rgba(203,178,106,0.08) 0%, transparent 70%)' }}
+                                    />
                                 </motion.div>
                             );
                         })}
@@ -551,33 +658,47 @@ export const Board = () => {
                                         offsetY = Math.sin(angle) * radius;
                                     }
 
+                                    const isActivePlayer = players[currentTurn]?.id === player.id;
                                     return (
                                         <motion.div
                                             key={player.id}
                                             layout
-                                            initial={false}
+                                            initial={{ opacity: 0, scale: 0, y: -20 }}
                                             animate={{
                                                 gridRowStart: gridRow,
                                                 gridColumnStart: gridColumn,
                                                 x: offsetX,
                                                 y: offsetY,
-                                                // Jump animation using keyframes for y-offset
-                                                translateY: [0, -25, 0]
+                                                opacity: 1,
+                                                scale: 1,
                                             }}
                                             transition={{
-                                                layout: { type: "spring", stiffness: 100, damping: 25 },
-                                                translateY: { duration: 0.4, ease: "easeOut" }
+                                                layout: { type: 'spring', stiffness: 120, damping: 22 },
+                                                opacity: { duration: 0.2 },
+                                                scale: { type: 'spring', stiffness: 200, damping: 18 },
                                             }}
-                                            className="w-full h-full flex items-center justify-center pointer-events-auto"
+                                            className="w-full h-full flex items-center justify-center pointer-events-auto relative"
                                             style={{ zIndex: 100 + playerIdx }}
                                         >
-                                            <div className="w-8 h-8 sm:w-11 sm:h-11 md:w-12 md:h-12 -mt-4 drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)]">
-                                                <Canvas camera={{ position: [0, 2.5, 5], fov: 35 }} style={{ pointerEvents: 'none' }}>
-                                                    <ambientLight intensity={0.7} />
-                                                    <directionalLight position={[10, 10, 5]} intensity={1.5} castShadow />
-                                                    <Token3D color={player.color} shape={player.shape} />
-                                                </Canvas>
-                                            </div>
+                                            {/* Pulsing ring for active player */}
+                                            {isActivePlayer && (
+                                                <motion.div
+                                                    className="absolute rounded-full pointer-events-none"
+                                                    style={{
+                                                        width: 36, height: 36,
+                                                        border: `2px solid ${player.color}`,
+                                                        boxShadow: `0 0 10px ${player.color}`,
+                                                    }}
+                                                    animate={{ scale: [1, 2.2], opacity: [0.9, 0] }}
+                                                    transition={{ repeat: Infinity, duration: 1.2, ease: 'easeOut' }}
+                                                />
+                                            )}
+                                            <PlayerToken
+                                                color={player.color}
+                                                shape={player.shape || 'sphere'}
+                                                size={total > 2 ? 26 : 32}
+                                                isActive={isActivePlayer}
+                                            />
                                         </motion.div>
                                     );
                                 })}
@@ -593,68 +714,125 @@ export const Board = () => {
                             <AnimatePresence>
                                 {hoveredSpaceId !== null && (
                                     <motion.div
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.8 }}
-                                        className="absolute z-[100] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#0A0810]/98 backdrop-blur-3xl border border-[#CBB26A]/30 p-8 rounded-[2.5rem] shadow-[0_50px_100px_rgba(0,0,0,0.9)] w-72 flex flex-col items-center text-center"
+                                        initial={{ opacity: 0, scale: 0.88, y: 8 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.88, y: 8 }}
+                                        className="absolute z-[100] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 backdrop-blur-2xl rounded-2xl shadow-[0_30px_80px_rgba(0,0,0,0.9)] w-64 overflow-hidden pointer-events-none"
+                                        style={{
+                                            background: 'linear-gradient(160deg, #1a1535ee 0%, #0d0a1aee 100%)',
+                                            border: `1px solid ${BOARD_SPACES[hoveredSpaceId].color || 'rgba(255,255,255,0.1)'}55`,
+                                        }}
                                     >
+                                        {/* Color header strip */}
                                         {BOARD_SPACES[hoveredSpaceId].color && (
-                                            <div className="w-full h-10 rounded-2xl mb-4 shadow-lg" style={{ backgroundColor: BOARD_SPACES[hoveredSpaceId].color, background: `linear-gradient(to bottom, ${BOARD_SPACES[hoveredSpaceId].color}, ${BOARD_SPACES[hoveredSpaceId].color}cc)` }} />
+                                            <div className="w-full h-2" style={{ background: BOARD_SPACES[hoveredSpaceId].color, boxShadow: `0 0 20px ${BOARD_SPACES[hoveredSpaceId].color}` }} />
                                         )}
-                                        <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#CBB26A] mb-1">{BOARD_SPACES[hoveredSpaceId].country || 'Exclusive'}</div>
-                                        <div className="text-xl font-black text-white mb-2 leading-tight">{BOARD_SPACES[hoveredSpaceId].name}</div>
 
-                                        {boardState[hoveredSpaceId]?.ownerId ? (
-                                            <div className="flex flex-col items-center gap-2 mb-4">
-                                                <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Owner</div>
-                                                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10">
-                                                    <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_10px_currentColor]" style={{ backgroundColor: players.find(p => p.id === boardState[hoveredSpaceId].ownerId)?.color, color: players.find(p => p.id === boardState[hoveredSpaceId].ownerId)?.color }} />
-                                                    <span className="text-xs font-black text-white">{players.find(p => p.id === boardState[hoveredSpaceId].ownerId)?.name}</span>
-                                                </div>
+                                        <div className="px-5 pt-4 pb-3">
+                                            {/* Country label */}
+                                            <div className="text-[9px] font-black uppercase tracking-[0.3em] mb-1" style={{ color: BOARD_SPACES[hoveredSpaceId].color || '#CBB26A' }}>
+                                                {BOARD_SPACES[hoveredSpaceId].country || BOARD_SPACES[hoveredSpaceId].type}
                                             </div>
-                                        ) : BOARD_SPACES[hoveredSpaceId].price ? (
-                                            <div className="text-xl font-mono font-black text-white mb-4 bg-white/5 px-4 py-1 rounded-xl border border-white/5 shadow-inner">${BOARD_SPACES[hoveredSpaceId].price}</div>
-                                        ) : null}
+                                            {/* Property name */}
+                                            <div className="text-xl font-black text-white leading-tight mb-4">
+                                                {BOARD_SPACES[hoveredSpaceId].name}
+                                            </div>
 
-                                        <div className="w-full space-y-2 text-left border-t border-white/10 pt-4">
-                                            {BOARD_SPACES[hoveredSpaceId].type === 'property' && BOARD_SPACES[hoveredSpaceId].rent && (
-                                                <>
-                                                    <div className="flex justify-between text-[10px] font-bold">
-                                                        <span className="text-slate-500 uppercase">Rent Only</span>
-                                                        <span className="text-white">${BOARD_SPACES[hoveredSpaceId].rent[0]}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-[10px] font-bold">
-                                                        <span className="text-slate-500 uppercase">With Hotel</span>
-                                                        <span className="text-[#CBB26A]">${BOARD_SPACES[hoveredSpaceId].rent[5]}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center pt-2 mt-2 border-t border-white/5">
-                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Build Cost</span>
-                                                        <span className="text-[11px] font-mono font-bold text-white">${BOARD_SPACES[hoveredSpaceId].housePrice} / house</span>
-                                                    </div>
-                                                </>
-                                            )}
-
-                                            {BOARD_SPACES[hoveredSpaceId].type === 'station' && (
-                                                <>
-                                                    <div className="flex justify-between text-[10px] items-center"><span className="text-slate-500 font-bold uppercase">1 Owned</span><span className="text-white">$25</span></div>
-                                                    <div className="flex justify-between text-[10px] items-center"><span className="text-slate-500 font-bold uppercase">2 Owned</span><span className="text-white">$50</span></div>
-                                                    <div className="flex justify-between text-[10px] items-center"><span className="text-slate-500 font-bold uppercase">3 Owned</span><span className="text-white">$100</span></div>
-                                                    <div className="flex justify-between text-[10px] items-center"><span className="text-slate-500 font-bold uppercase">4 Owned</span><span className="text-[#CBB26A]">$200</span></div>
-                                                </>
-                                            )}
-
-                                            {BOARD_SPACES[hoveredSpaceId].type === 'utility' && (
-                                                <div className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed text-center italic py-2">
-                                                    Rent is 4x roll if 1 owned, <br /> or 10x roll if both owned.
+                                            {/* Owner Badge */}
+                                            {boardState[hoveredSpaceId]?.ownerId && (
+                                                <div className="flex items-center gap-2 mb-3 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 w-fit">
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: players.find(p => p.id === boardState[hoveredSpaceId].ownerId)?.color }} />
+                                                    <span className="text-[10px] font-black text-white">{players.find(p => p.id === boardState[hoveredSpaceId].ownerId)?.name}</span>
                                                 </div>
                                             )}
 
+                                            {/* RENT TABLE */}
+                                            {BOARD_SPACES[hoveredSpaceId].type === 'property' && BOARD_SPACES[hoveredSpaceId].rent && (() => {
+                                                const rent = BOARD_SPACES[hoveredSpaceId].rent!;
+                                                const rows = [
+                                                    { label: 'with rent', value: rent[0], highlight: false },
+                                                    { label: 'with one house', value: rent[1], highlight: false },
+                                                    { label: 'with two houses', value: rent[2], highlight: false },
+                                                    { label: 'with three houses', value: rent[3], highlight: false },
+                                                    { label: 'with four houses', value: rent[4], highlight: false },
+                                                    { label: 'with a hotel', value: rent[5], highlight: true },
+                                                ];
+                                                return (
+                                                    <div className="w-full border border-white/8 rounded-xl overflow-hidden mb-4" style={{ background: 'rgba(0,0,0,0.3)' }}>
+                                                        <div className="flex justify-between px-3 py-1 border-b border-white/5">
+                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">when</span>
+                                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">get</span>
+                                                        </div>
+                                                        {rows.map((row, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className="flex justify-between items-center px-3 py-1.5 border-b border-white/5 last:border-0"
+                                                                style={{ background: row.highlight ? `${BOARD_SPACES[hoveredSpaceId].color}18` : 'transparent' }}
+                                                            >
+                                                                <span className={`text-[10px] font-semibold ${row.highlight ? 'text-white font-black' : 'text-slate-400'}`}>
+                                                                    {row.label}
+                                                                </span>
+                                                                <span
+                                                                    className="text-[11px] font-black font-mono"
+                                                                    style={{ color: row.highlight ? (BOARD_SPACES[hoveredSpaceId].color || '#CBB26A') : '#fff' }}
+                                                                >
+                                                                    ${row.value}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* STATION rents */}
+                                            {BOARD_SPACES[hoveredSpaceId].type === 'station' && (
+                                                <div className="w-full border border-white/8 rounded-xl overflow-hidden mb-4" style={{ background: 'rgba(0,0,0,0.3)' }}>
+                                                    {[['1 station owned', '$25'], ['2 stations owned', '$50'], ['3 stations owned', '$100'], ['4 stations owned', '$200']].map(([label, val], i) => (
+                                                        <div key={i} className="flex justify-between items-center px-3 py-1.5 border-b border-white/5 last:border-0">
+                                                            <span className="text-[10px] text-slate-400 font-semibold">{label}</span>
+                                                            <span className="text-[11px] font-black text-white font-mono">{val}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* UTILITY info */}
+                                            {BOARD_SPACES[hoveredSpaceId].type === 'utility' && (
+                                                <div className="text-[10px] text-slate-400 font-semibold leading-relaxed italic text-center py-2 px-2">
+                                                    Rent is <b className="text-white">4×</b> dice roll if 1 owned,<br />or <b className="text-white">10×</b> dice roll if both owned.
+                                                </div>
+                                            )}
+
+                                            {/* TAX info */}
                                             {BOARD_SPACES[hoveredSpaceId].type === 'tax' && (
-                                                <div className="text-[10px] text-rose-400 font-black text-center uppercase tracking-widest py-2">
-                                                    Government Fee <br /> ${BOARD_SPACES[hoveredSpaceId].price || '10%'}
+                                                <div className="text-[11px] text-rose-400 font-black text-center uppercase tracking-widest py-2">
+                                                    Government Fee<br />${BOARD_SPACES[hoveredSpaceId].price || '10%'}
                                                 </div>
                                             )}
                                         </div>
+
+                                        {/* FOOTER: Price / House / Hotel */}
+                                        {BOARD_SPACES[hoveredSpaceId].type === 'property' && (
+                                            <div
+                                                className="flex items-stretch divide-x divide-white/10 border-t border-white/10"
+                                                style={{ background: 'rgba(0,0,0,0.35)' }}
+                                            >
+                                                <div className="flex-1 flex flex-col items-center py-2.5 gap-0.5">
+                                                    <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest">Price</span>
+                                                    <span className="text-[12px] font-black text-white font-mono">${BOARD_SPACES[hoveredSpaceId].price}</span>
+                                                </div>
+                                                <div className="w-px bg-white/8" />
+                                                <div className="flex-1 flex flex-col items-center py-2.5 gap-0.5">
+                                                    <span className="text-base leading-none">🏠</span>
+                                                    <span className="text-[12px] font-black text-white font-mono">${BOARD_SPACES[hoveredSpaceId].housePrice}</span>
+                                                </div>
+                                                <div className="w-px bg-white/8" />
+                                                <div className="flex-1 flex flex-col items-center py-2.5 gap-0.5">
+                                                    <span className="text-base leading-none">🏨</span>
+                                                    <span className="text-[12px] font-black text-white font-mono">${BOARD_SPACES[hoveredSpaceId].housePrice}</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -710,23 +888,57 @@ export const Board = () => {
                                     </button>
                                 )}
 
-                                <div className="flex flex-row gap-4 sm:gap-6 w-full justify-center">
-                                    <button
-                                        onClick={handleRollClick}
-                                        disabled={!canRoll}
-                                        className={`flex-1 max-w-[190px] py-4 rounded-full font-black text-xs tracking-[0.3em] bg-gradient-to-br from-[#CBB26A] via-[#DBC27A] to-[#8E793E] text-[#0A0810] hover:scale-110 active:scale-95 transition-all shadow-[0_15px_40px_rgba(203,178,106,0.4)] flex items-center justify-center gap-3 group relative overflow-hidden ${!canRoll ? 'opacity-0 scale-90 pointer-events-none' : 'scale-100 animate-pulse'}`}
-                                    >
-                                        <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-12" />
-                                        ROLL <div className="w-5 h-5 bg-[#0A0810]/20 rounded-lg flex items-center justify-center text-[10px] group-hover:rotate-[360deg] transition-transform duration-700">🎲</div>
-                                    </button>
-                                    <button
-                                        onClick={() => { if (canEndTurn) endTurn() }}
-                                        disabled={!canEndTurn}
-                                        className={`flex-1 max-w-[170px] py-4 rounded-full font-black text-[10px] sm:text-xs tracking-[0.3em] border border-[#CBB26A]/30 text-[#CBB26A] bg-black/40 backdrop-blur-md hover:bg-[#CBB26A] hover:text-[#0A0810] hover:scale-105 active:scale-95 transition-all ${!canEndTurn ? 'opacity-0 scale-90 pointer-events-none' : 'scale-100'}`}
-                                    >
-                                        END TURN
-                                    </button>
-                                </div>
+                                {players.length > 0 && (
+                                    <div className="flex flex-row gap-4 sm:gap-6 w-full justify-center">
+                                        <motion.button
+                                            whileHover={canRoll ? { scale: 1.05, boxShadow: "0 30px 60px rgba(203,178,106,0.5)" } : {}}
+                                            whileTap={canRoll ? { scale: 0.95 } : {}}
+                                            onClick={handleRollClick}
+                                            disabled={!canRoll}
+                                            className={`
+                                                flex-1 max-w-[220px] h-16 rounded-2xl font-black text-[11px] tracking-[0.4em] uppercase 
+                                                transition-all duration-500 relative overflow-hidden group
+                                                ${!canRoll
+                                                    ? 'opacity-0 scale-90 pointer-events-none'
+                                                    : 'bg-gradient-to-br from-[#F0D080] via-[#CBB26A] to-[#8E793E] text-[#0A0810] shadow-[0_20px_40px_rgba(0,0,0,0.5)] cursor-pointer'
+                                                }
+                                            `}
+                                        >
+                                            {/* Shine effect that only activates on hover */}
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-[120%] group-hover:animate-[shimmer_1.5s_infinite] skew-x-12" />
+
+                                            <div className="relative flex items-center justify-center gap-3">
+                                                <span className="drop-shadow-sm">ROLL DICE</span>
+                                                <div className="w-8 h-8 bg-black/10 rounded-xl flex items-center justify-center text-xl group-hover:rotate-[360deg] transition-transform duration-1000">
+                                                    🎲
+                                                </div>
+                                            </div>
+
+                                            {/* Pulse ring for when it's your turn and you haven't rolled yet */}
+                                            {canRoll && (
+                                                <div className="absolute inset-0 rounded-2xl border-2 border-[#F0D080] animate-ping opacity-20 pointer-events-none" />
+                                            )}
+                                        </motion.button>
+
+                                        <motion.button
+                                            whileHover={canEndTurn ? { scale: 1.05, backgroundColor: "rgba(203,178,106,1)", color: "#0A0810" } : {}}
+                                            whileTap={canEndTurn ? { scale: 0.95 } : {}}
+                                            onClick={() => { if (canEndTurn) endTurn() }}
+                                            disabled={!canEndTurn}
+                                            className={`
+                                                flex-1 max-w-[180px] h-16 rounded-2xl font-black text-[10px] tracking-[0.3em] uppercase
+                                                border-2 border-[#CBB26A]/40 text-[#CBB26A] bg-black/40 backdrop-blur-md
+                                                transition-all duration-500 relative overflow-hidden group
+                                                ${!canEndTurn ? 'opacity-0 scale-90 pointer-events-none' : 'opacity-100 cursor-pointer'}
+                                            `}
+                                        >
+                                            <div className="relative flex items-center justify-center gap-2">
+                                                END TURN
+                                                <ArrowRight size={14} className="group-hover:translate-x-1 cursor-pointer transition-transform" />
+                                            </div>
+                                        </motion.button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Purchase Modal / Property Info Center */}
@@ -756,16 +968,29 @@ export const Board = () => {
                                             </div>
                                             <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col items-center">
                                                 <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Rent</div>
-                                                <div className="text-lg font-mono font-bold text-[#CBB26A]">${BOARD_SPACES[activeModalSpaceId].rent ? BOARD_SPACES[activeModalSpaceId].rent[0] : '0'}</div>
+                                                <div className="text-lg font-mono font-bold text-[#CBB26A]">${BOARD_SPACES[activeModalSpaceId].rent ? BOARD_SPACES[activeModalSpaceId].rent[boardState[activeModalSpaceId]?.houses || 0] : '0'}</div>
                                             </div>
                                         </div>
 
-                                        <button
-                                            onClick={() => buyProperty(players[currentTurn].id, activeModalSpaceId)}
-                                            className="w-full py-4 rounded-2xl bg-[#CBB26A] text-[#0A0810] font-black text-sm tracking-[0.2em] shadow-[0_10px_30px_rgba(203,178,106,0.2)] hover:bg-[#DBC27A] hover:scale-[1.02] active:scale-95 transition-all mb-4"
-                                        >
-                                            ACQUIRE ASSET
-                                        </button>
+                                        {!boardState[activeModalSpaceId]?.ownerId ? (
+                                            <button
+                                                onClick={() => buyProperty(players[currentTurn].id, activeModalSpaceId)}
+                                                className="w-full py-4 rounded-2xl bg-[#CBB26A] text-[#0A0810] font-black text-sm tracking-[0.2em] shadow-[0_10px_30px_rgba(203,178,106,0.2)] hover:bg-[#DBC27A] hover:scale-[1.02] active:scale-95 transition-all mb-4"
+                                            >
+                                                ACQUIRE ASSET
+                                            </button>
+                                        ) : boardState[activeModalSpaceId].ownerId === players[currentTurn].id && BOARD_SPACES[activeModalSpaceId].type === 'property' && boardState[activeModalSpaceId].houses < 5 ? (
+                                            <button
+                                                onClick={() => buildHouse(players[currentTurn].id, activeModalSpaceId)}
+                                                className="w-full py-4 rounded-2xl bg-[#8A58FF] text-white font-black text-sm tracking-[0.2em] shadow-[0_10px_30px_rgba(138,88,255,0.2)] hover:bg-[#9E75FF] hover:scale-[1.02] active:scale-95 transition-all mb-4"
+                                            >
+                                                BUILD UPGRADE (${BOARD_SPACES[activeModalSpaceId].housePrice})
+                                            </button>
+                                        ) : (
+                                            <div className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-slate-500 text-center text-xs font-black uppercase tracking-widest mb-4">
+                                                ASSET MAXED OUT
+                                            </div>
+                                        )}
                                         <div className="text-[9px] text-slate-500 font-bold uppercase tracking-tight italic">Increase your net worth and dominate the coast</div>
                                     </motion.div>
                                 )}
@@ -847,12 +1072,118 @@ export const Board = () => {
                             <div>
                                 <div className="text-xs font-bold text-white mb-4 bg-[#2A2438] py-2 px-3 rounded-lg text-center uppercase tracking-widest shadow-inner">Game settings</div>
                                 <div className="flex flex-col gap-4 px-2">
-                                    <div className="flex justify-between items-center">
+                                    <div className="flex justify-between items-center bg-[#0E0B16] p-3 rounded-2xl border border-white/5">
                                         <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-slate-200">Start Money</span>
-                                            <span className="text-[10px] text-slate-500 font-medium">Initial bank balance</span>
+                                            <span className="text-xs font-bold text-slate-200">Dice Theme</span>
+                                            <span className="text-[10px] text-slate-500 font-medium">Select your lucky dice</span>
                                         </div>
-                                        <input type="number" value={startMoney} onChange={e => setStartMoney(Number(e.target.value))} className="w-24 bg-[#0E0B16] border border-[#2A2438] rounded-xl px-2 py-2 text-sm outline-none focus:border-[#CBB26A] text-center font-mono font-bold text-white shadow-inner" />
+                                        <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
+                                            <button
+                                                onClick={() => setDicePreference('white')}
+                                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${dicePreference === 'white' ? 'bg-[#CBB26A] text-[#0A0810] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                            >
+                                                WHITE
+                                            </button>
+                                            <button
+                                                onClick={() => setDicePreference('red')}
+                                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${dicePreference === 'red' ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                            >
+                                                RED
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center bg-[#0E0B16] p-3 rounded-2xl border border-white/5">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-bold text-slate-200">Building Rules</span>
+                                            <span className="text-[10px] text-slate-500 font-medium">Free Build vs Monopoly</span>
+                                        </div>
+                                        <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
+                                            <button
+                                                onClick={() => setMonopolyRequiredToBuild(false)}
+                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black transition-all ${!monopolyRequiredToBuild ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                            >
+                                                FREE
+                                            </button>
+                                            <button
+                                                onClick={() => setMonopolyRequiredToBuild(true)}
+                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black transition-all ${monopolyRequiredToBuild ? 'bg-[#CBB26A] text-[#0A0810] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                            >
+                                                MONOPOLY
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 mt-6 px-1">Gameplay rules</div>
+                                    <div className="flex flex-col bg-[#0E0B16] rounded-2xl border border-white/5 divide-y divide-white/5 overflow-hidden">
+                                        <RuleToggle
+                                            icon={Coins}
+                                            title="x2 rent on full-sets"
+                                            description="Base rent is doubled when owning a full country set"
+                                            value={rules.doubleRentOnSets}
+                                            onChange={(v) => setRule('doubleRentOnSets', v)}
+                                        />
+                                        <RuleToggle
+                                            icon={Palmtree}
+                                            title="Vacation cash"
+                                            description="Collected taxes are earned by landing on Vacation"
+                                            value={rules.vacationCash}
+                                            onChange={(v) => setRule('vacationCash', v)}
+                                        />
+                                        <RuleToggle
+                                            icon={Gavel}
+                                            title="Auction"
+                                            description="Unpurchased properties are sold to highest bidder"
+                                            value={rules.auctionEnabled}
+                                            onChange={(v) => setRule('auctionEnabled', v)}
+                                        />
+                                        <RuleToggle
+                                            icon={Lock}
+                                            title="No rent in jail"
+                                            description="Rent is not collected while owner is in prison"
+                                            value={rules.noRentInJail}
+                                            onChange={(v) => setRule('noRentInJail', v)}
+                                        />
+                                        <RuleToggle
+                                            icon={DollarSign}
+                                            title="Mortgage"
+                                            description="Mortgage properties to earn 50% of cost back"
+                                            value={rules.mortgageEnabled}
+                                            onChange={(v) => setRule('mortgageEnabled', v)}
+                                        />
+                                        <RuleToggle
+                                            icon={Home}
+                                            title="Even build"
+                                            description="Houses must be distributed evenly within sets"
+                                            value={rules.evenBuild}
+                                            onChange={(v) => setRule('evenBuild', v)}
+                                        />
+                                        <RuleToggle
+                                            icon={Shuffle}
+                                            title="Randomize player order"
+                                            description="Randomly reorder players at the match start"
+                                            value={rules.randomizeOrder}
+                                            onChange={(v) => setRule('randomizeOrder', v)}
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-between items-center mt-8 px-2 mb-2">
+                                        <div className="flex flex-col">
+                                            <span className="text-lg font-black text-white tracking-tighter">Starting cash</span>
+                                            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-widest">Initial bank balance</span>
+                                        </div>
+                                        <div className="relative">
+                                            <select
+                                                value={startMoney}
+                                                onChange={e => setStartMoney(Number(e.target.value))}
+                                                className="bg-[#1A1625] border border-white/10 rounded-2xl px-6 py-3 text-sm font-mono font-black text-white outline-none focus:border-[#CBB26A] shadow-2xl cursor-pointer appearance-none pr-10 transition-all hover:bg-[#231E32]"
+                                            >
+                                                {[1500, 2000, 2500, 3000, 3500, 4000].map(val => (
+                                                    <option key={val} value={val}>${val}</option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#CBB26A]">
+                                                <ChevronRight size={16} className="rotate-90" />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1032,6 +1363,86 @@ export const Board = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div >
+            {/* CHAT FLOATING POPUP */}
+            {players.length > 0 && (
+                <div className="fixed bottom-6 left-6 z-[1000] flex flex-col items-start gap-4 pointer-events-none">
+                    <AnimatePresence>
+                        {isChatOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 20, transformOrigin: 'bottom left' }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                className="w-[320px] h-[450px] bg-[#0A0810]/95 backdrop-blur-3xl border border-white/10 rounded-3xl shadow-[0_50px_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden pointer-events-auto"
+                            >
+                                <div className="px-6 py-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[#CBB26A]">Crew Chat</span>
+                                    </div>
+                                    <button onClick={() => setIsChatOpen(false)} className="text-slate-500 hover:text-white transition-colors">✕</button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6 custom-scrollbar">
+                                    {chatMessages.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center opacity-20 select-none">
+                                            <div className="text-4xl mb-3">💬</div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest">No signals yet</div>
+                                        </div>
+                                    ) : (
+                                        chatMessages.map(msg => (
+                                            <div key={msg.id} className="flex flex-col group">
+                                                <div className="flex items-center gap-2 mb-1.5">
+                                                    <div className="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: msg.senderColor, color: msg.senderColor }} />
+                                                    <span className="text-[10px] font-black text-white/40 uppercase tracking-tighter">{msg.senderName}</span>
+                                                    <span className="text-[8px] text-white/20 font-mono ml-auto">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                                <div className="bg-white/5 rounded-2xl rounded-tl-none px-4 py-3 text-xs text-slate-200 border border-white/5 group-hover:bg-white/10 transition-colors leading-relaxed">
+                                                    {msg.text}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                    <div ref={chatEndRef} />
+                                </div>
+
+                                <div className="p-4 bg-[#0E0B16] border-t border-white/10">
+                                    <form
+                                        onSubmit={(e) => { e.preventDefault(); handleSendChat(); }}
+                                        className="relative flex items-center bg-white/5 rounded-2xl border border-white/10 focus-within:border-[#CBB26A]/50 transition-all p-1.5"
+                                    >
+                                        <input
+                                            type="text"
+                                            value={chatInput}
+                                            onChange={(e) => setChatInput(e.target.value)}
+                                            placeholder="Transmit message..."
+                                            className="flex-1 bg-transparent py-2 pl-4 pr-12 text-xs text-white outline-none placeholder:text-slate-600 font-medium"
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={!chatInput.trim()}
+                                            className="absolute right-1.5 w-9 h-9 rounded-xl bg-[#CBB26A] text-[#0A0810] flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:grayscale"
+                                        >
+                                            <Send size={16} />
+                                        </button>
+                                    </form>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <button
+                        onClick={() => setIsChatOpen(!isChatOpen)}
+                        className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl transition-all hover:scale-110 active:scale-90 pointer-events-auto relative ${isChatOpen ? 'bg-white text-black' : 'bg-[#CBB26A] text-[#0A0810]'}`}
+                    >
+                        {isChatOpen ? <span className="text-xl font-black">✕</span> : <Send size={24} />}
+                        {chatMessages.length > 0 && !isChatOpen && (
+                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 rounded-full border-2 border-[#0A0810] flex items-center justify-center text-[10px] font-black text-white">
+                                {chatMessages.length > 9 ? '9+' : chatMessages.length}
+                            </div>
+                        )}
+                    </button>
+                </div>
+            )}
+        </div>
     );
 };

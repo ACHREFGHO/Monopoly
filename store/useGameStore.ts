@@ -63,6 +63,18 @@ interface GameState {
     activeCard: { title: string, description: string, type: 'chance' | 'chest' } | null;
     activeTrade: TradeOffer | null;
     chatMessages: { id: string, senderName: string, senderColor: string, text: string, timestamp: number }[];
+    dicePreference: 'red' | 'white';
+    monopolyRequiredToBuild: boolean;
+    rules: {
+        doubleRentOnSets: boolean;
+        vacationCash: boolean;
+        auctionEnabled: boolean;
+        noRentInJail: boolean;
+        mortgageEnabled: boolean;
+        evenBuild: boolean;
+        randomizeOrder: boolean;
+    };
+    potMoney: number;
 
     // Actions
     rollDice: () => Promise<void>;
@@ -77,6 +89,11 @@ interface GameState {
     initGame: (players: Omit<Player, "position" | "money" | "inJail" | "jailTurns">[], startingMoney?: number) => void;
     setActiveModalSpaceId: (spaceId: number | null) => void;
     dismissCard: () => void;
+    setDicePreference: (pref: 'red' | 'white') => void;
+    setMonopolyRequiredToBuild: (required: boolean) => void;
+    setRule: (rule: keyof GameState['rules'], value: boolean) => void;
+    buildHouse: (playerId: string, spaceId: number) => void;
+    postBail: (playerId: string) => void;
 }
 
 // --- BOARD DEFINITION (24 properties, 3 per country) ---
@@ -125,23 +142,99 @@ export const BOARD_SPACES: Space[] = [
 
 const CHANCE_CARDS: Card[] = [
     { title: "Advance to GO", description: "Collect $200", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) { p.position = 0; p.money += 200; } return { players: ps }; }); } },
-    { title: "Speeding Fine", description: "Pay $15", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 15; return { players: ps }; }); } },
     {
-        title: "Go Back 3 Spaces", description: "Move back 3 spaces", action: async (id, get, set) => {
+        title: "Kairouan Trip", description: "Advance to Kairouan. If you pass GO, collect $200", action: async (id, get, set) => {
             const store = get();
-            await store.movePlayerStepByStep(id, -3);
+            const p = store.players.find(pl => pl.id === id);
+            if (!p) return;
+            let steps = (1 - p.position + 40) % 40;
+            await store.movePlayerStepByStep(id, steps);
         }
     },
-    { title: "Bank pays you dividend", description: "Receive $50", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 50; return { players: ps }; }); } },
-    { title: "Go to Jail", description: "Do not pass GO, do not collect $200", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) { p.position = 10; p.inJail = true; } return { players: ps }; }); } },
+    {
+        title: "Athens Express", description: "Advance to Athens", action: async (id, get, set) => {
+            const store = get();
+            const p = store.players.find(pl => pl.id === id);
+            if (!p) return;
+            let steps = (39 - p.position + 40) % 40;
+            await store.movePlayerStepByStep(id, steps);
+        }
+    },
+    { title: "Bank Pays Divided", description: "Receive $50", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 50; return { players: ps }; }); } },
+    { title: "Get Out of Jail Free", description: "Dismiss this encounter", action: async (id, get, set) => { /* Already handled by dismissal in UI for now */ } },
+    { title: "Go Back 3 Spaces", description: "Move back 3 positions", action: async (id, get, set) => { await get().movePlayerStepByStep(id, -3); } },
+    { title: "School Fees", description: "Pay $150", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 150; return { players: ps }; }); } },
+    { title: "Speeding Fine", description: "Pay $15", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 15; return { players: ps }; }); } },
+    { title: "Drunk in Charge", description: "Pay $20", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 20; return { players: ps }; }); } },
+    { title: "Building Loan Mature", description: "Collect $150", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 150; return { players: ps }; }); } },
+    {
+        title: "Street Repairs", description: "Pay $40 per house owned", action: async (id, get, set) => {
+            set(s => {
+                const ps = [...s.players];
+                const p = ps.find(pl => pl.id === id);
+                if (!p) return s;
+                let houseCount = 0;
+                Object.values(s.boardState).forEach(st => { if (st.ownerId === id) houseCount += st.houses; });
+                p.money -= (houseCount * 40);
+                return { players: ps };
+            });
+        }
+    },
+    {
+        title: "Chairman of Board", description: "Pay each player $50", action: async (id, get, set) => {
+            set(s => {
+                const ps = [...s.players];
+                const p = ps.find(pl => pl.id === id);
+                if (!p) return s;
+                ps.forEach(pl => { if (pl.id !== id) { pl.money += 50; p.money -= 50; } });
+                return { players: ps };
+            });
+        }
+    },
+    {
+        title: "Grand Larceny", description: "Steal $300 from a specific opponent!", action: async (id, get, set) => {
+            set(s => {
+                const others = s.players.filter(p => p.id !== id);
+                if (others.length === 0) return s;
+                const targetIdx = Math.floor(Math.random() * others.length);
+                const target = others[targetIdx];
+                const newPlayers = s.players.map(p => {
+                    if (p.id === id) return { ...p, money: p.money + 300 };
+                    if (p.id === target.id) return { ...p, money: p.money - 300 };
+                    return p;
+                });
+                return { players: newPlayers };
+            });
+        }
+    },
+    {
+        title: "Pickpocket", description: "Steal $100 from a specific opponent!", action: async (id, get, set) => {
+            set(s => {
+                const others = s.players.filter(p => p.id !== id);
+                if (others.length === 0) return s;
+                const targetIdx = Math.floor(Math.random() * others.length);
+                const target = others[targetIdx];
+                const newPlayers = s.players.map(p => {
+                    if (p.id === id) return { ...p, money: p.money + 100 };
+                    if (p.id === target.id) return { ...p, money: p.money - 100 };
+                    return p;
+                });
+                return { players: newPlayers };
+            });
+        }
+    },
 ];
 
 const CHEST_CARDS: Card[] = [
-    { title: "Bank Error in Your Favor", description: "Collect $200", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 200; return { players: ps }; }); } },
-    { title: "Doctor's Fees", description: "Pay $50", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 50; return { players: ps }; }); } },
-    { title: "Holiday Fund Matures", description: "Receive $100", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 100; return { players: ps }; }); } },
-    { title: "Income Tax Refund", description: "Collect $20", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 20; return { players: ps }; }); } },
+    { title: "Inheritance", description: "Collect $100", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 100; return { players: ps }; }); } },
+    { title: "Stock Boom", description: "Collect $50", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 50; return { players: ps }; }); } },
+    { title: "Life Insurance", description: "Collect $100", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 100; return { players: ps }; }); } },
     { title: "Hospital Fees", description: "Pay $100", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 100; return { players: ps }; }); } },
+    { title: "Consultancy Fee", description: "Receive $25", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 25; return { players: ps }; }); } },
+    { title: "Income Tax Refund", description: "Collect $20", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 20; return { players: ps }; }); } },
+    { title: "Holiday Fund Matures", description: "Receive $100", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 100; return { players: ps }; }); } },
+    { title: "Go to Jail", description: "Move to Jail. Do not pass GO.", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) { p.position = 10; p.inJail = true; } return { players: ps }; }); } },
+    { title: "Bank Overdraft", description: "Pay $50", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 50; return { players: ps }; }); } },
 ];
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -156,7 +249,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     activeTrade: null,
     hasRolled: false,
     chatMessages: [],
-
+    dicePreference: 'white',
+    monopolyRequiredToBuild: true,
+    rules: {
+        doubleRentOnSets: true,
+        vacationCash: true,
+        auctionEnabled: true,
+        noRentInJail: false,
+        mortgageEnabled: true,
+        evenBuild: true,
+        randomizeOrder: true,
+    },
+    potMoney: 0,
     dismissCard: () => set({ activeCard: null }),
 
     setActiveModalSpaceId: (spaceId) => set({ activeModalSpaceId: spaceId }),
@@ -202,11 +306,28 @@ export const useGameStore = create<GameState>((set, get) => ({
     },
 
     initGame: (initialPlayers, startingMoney = 1500) => {
-        const players: Player[] = initialPlayers.map(p => ({
+        let players: Player[] = initialPlayers.map(p => ({
             ...p, position: 0, money: startingMoney, inJail: false, jailTurns: 0
         }));
-        set({ players, currentTurn: 0, boardState: {}, diceRoll: null, isMoving: false, activeCard: null, activeModalSpaceId: null, hasRolled: false, chatMessages: [] });
+
+        if (get().rules.randomizeOrder) {
+            players = [...players].sort(() => Math.random() - 0.5);
+        }
+
+        set({
+            players,
+            currentTurn: 0,
+            boardState: {},
+            diceRoll: null,
+            isMoving: false,
+            activeCard: null,
+            activeModalSpaceId: null,
+            hasRolled: false,
+            chatMessages: [],
+            potMoney: 0
+        });
     },
+    setDicePreference: (pref) => set({ dicePreference: pref }),
 
     sendMessage: (text) => {
         const state = get();
@@ -242,21 +363,29 @@ export const useGameStore = create<GameState>((set, get) => ({
             set({ hasRolled: !isDouble });
             await store.movePlayerStepByStep(currentPlayer.id, d1 + d2);
         } else {
-            // Free from jail on doubles (simplified)
+            // Free from jail on doubles
             if (d1 === d2) {
                 set(s => {
                     const ps = [...s.players];
-                    const pIdx = ps.findIndex(p => p.id === currentPlayer.id);
-                    ps[pIdx] = { ...ps[pIdx], inJail: false, jailTurns: 0 };
+                    const idx = ps.findIndex(p => p.id === currentPlayer.id);
+                    if (idx > -1) ps[idx] = { ...ps[idx], inJail: false, jailTurns: 0 };
                     return { players: ps, hasRolled: true };
                 });
                 await get().movePlayerStepByStep(currentPlayer.id, d1 + d2);
             } else {
                 set(s => {
                     const ps = [...s.players];
-                    const pIdx = ps.findIndex(p => p.id === currentPlayer.id);
-                    ps[pIdx] = { ...ps[pIdx], jailTurns: ps[pIdx].jailTurns + 1 };
-                    return { players: ps, isMoving: false, hasRolled: true };
+                    const idx = ps.findIndex(p => p.id === currentPlayer.id);
+                    if (idx > -1) {
+                        const newTurns = ps[idx].jailTurns + 1;
+                        if (newTurns >= 3) {
+                            // Forced to pay bail after 3 turns or just let out? Let's say let out.
+                            ps[idx] = { ...ps[idx], inJail: false, jailTurns: 0 };
+                        } else {
+                            ps[idx] = { ...ps[idx], jailTurns: newTurns };
+                        }
+                    }
+                    return { players: ps, hasRolled: true };
                 });
             }
         }
@@ -327,13 +456,16 @@ export const useGameStore = create<GameState>((set, get) => ({
                 const ps = [...s.players];
                 const idx = ps.findIndex(p => p.id === playerId);
                 if (idx > -1) {
+                    let taxAmount = 0;
                     if (space.id === 4) {
-                        // Tunis/Income Tax: 10%
-                        const tenPercent = Math.floor(ps[idx].money * 0.1);
-                        ps[idx].money -= tenPercent;
+                        taxAmount = Math.floor(ps[idx].money * 0.1);
                     } else {
-                        // Other taxes (like Travel Tax): Fixed Price
-                        ps[idx].money -= (space.price || 100);
+                        taxAmount = (space.price || 100);
+                    }
+                    ps[idx].money -= taxAmount;
+
+                    if (s.rules.vacationCash) {
+                        return { players: ps, potMoney: s.potMoney + taxAmount };
                     }
                 }
                 return { players: ps };
@@ -342,10 +474,33 @@ export const useGameStore = create<GameState>((set, get) => ({
             return;
         }
 
+        if (space.type === 'parking') {
+            if (state.rules.vacationCash && state.potMoney > 0) {
+                set(s => {
+                    const ps = [...s.players];
+                    const idx = ps.findIndex(p => p.id === playerId);
+                    if (idx > -1) {
+                        ps[idx].money += s.potMoney;
+                        return { players: ps, potMoney: 0 };
+                    }
+                    return s;
+                });
+            }
+            set({ isMoving: false });
+            return;
+        }
+
         // Rent calculation
         if (space.type === 'property' || space.type === 'station' || space.type === 'utility') {
             const bState = state.boardState[space.id];
             if (bState && bState.ownerId && bState.ownerId !== playerId && !bState.isMortgaged) {
+                const owner = state.players.find(p => p.id === bState.ownerId);
+                // Rule: Don't collect rent while in prison
+                if (state.rules.noRentInJail && owner?.inJail) {
+                    set({ isMoving: false });
+                    return;
+                }
+
                 let rentAmount = 0;
                 if (space.type === 'property' && space.rent) {
                     const ownerProps = BOARD_SPACES.filter(s =>
@@ -356,7 +511,8 @@ export const useGameStore = create<GameState>((set, get) => ({
                     const hasMonopoly = ownerProps.length === totalInCountry;
 
                     if (bState.houses === 0) {
-                        rentAmount = hasMonopoly ? space.rent[0] * 2 : space.rent[0];
+                        const multiplier = (hasMonopoly && state.rules.doubleRentOnSets) ? 2 : 1;
+                        rentAmount = space.rent[0] * multiplier;
                     } else {
                         rentAmount = space.rent[bState.houses];
                     }
@@ -414,6 +570,69 @@ export const useGameStore = create<GameState>((set, get) => ({
         });
     },
 
+    setMonopolyRequiredToBuild: (required) => set({ monopolyRequiredToBuild: required }),
+    setRule: (rule, value) => set(state => ({
+        rules: { ...state.rules, [rule]: value }
+    })),
+    buildHouse: (playerId, spaceId) => {
+        set(state => {
+            const space = BOARD_SPACES[spaceId];
+            if (!space || space.type !== 'property' || !space.housePrice) return state;
+
+            const propertyState = state.boardState[spaceId];
+            if (!propertyState || propertyState.ownerId !== playerId || propertyState.houses >= 5 || propertyState.isMortgaged) return state;
+
+            // Check money
+            const players = [...state.players];
+            const pIdx = players.findIndex(p => p.id === playerId);
+            if (pIdx === -1 || players[pIdx].money < space.housePrice) return state;
+
+            // Check monopoly if required
+            if (state.monopolyRequiredToBuild) {
+                const totalInCountry = BOARD_SPACES.filter(s => s.country === space.country).length;
+                const ownedInCountry = BOARD_SPACES.filter(s =>
+                    s.country === space.country &&
+                    state.boardState[s.id]?.ownerId === playerId
+                ).length;
+
+                if (ownedInCountry < totalInCountry) return state;
+            }
+
+            // Check even building
+            if (state.rules.evenBuild) {
+                const countryProps = BOARD_SPACES.filter(s => s.country === space.country);
+                const currentHouses = propertyState.houses;
+                const otherPropsInSet = countryProps.filter(s => s.id !== spaceId);
+
+                // You can only build if all other properties in the set have at least as many houses as this one
+                const canBuild = otherPropsInSet.every(s => {
+                    const st = state.boardState[s.id];
+                    return st && st.houses >= currentHouses;
+                });
+
+                if (!canBuild) return state;
+            }
+
+            // Execute build
+            players[pIdx] = { ...players[pIdx], money: players[pIdx].money - space.housePrice };
+            const newBoardState = {
+                ...state.boardState,
+                [spaceId]: { ...propertyState, houses: propertyState.houses + 1 }
+            };
+
+            return { players, boardState: newBoardState };
+        });
+    },
+    postBail: (playerId) => {
+        set(state => {
+            const players = [...state.players];
+            const pIdx = players.findIndex(p => p.id === playerId);
+            if (pIdx === -1 || !players[pIdx].inJail || players[pIdx].money < 100) return state;
+
+            players[pIdx] = { ...players[pIdx], money: players[pIdx].money - 100, inJail: false, jailTurns: 0 };
+            return { players };
+        });
+    },
     endTurn: () => {
         if (get().isMoving || get().activeModalSpaceId !== null || !get().hasRolled) return;
         set(state => {
