@@ -1090,7 +1090,7 @@ export const Board = () => {
                                                 opacity: { duration: 0.2 },
                                                 scale: { type: 'spring', stiffness: 200, damping: 18 },
                                             }}
-                                            className="w-full h-full flex items-center justify-center pointer-events-auto relative"
+                                            className="w-full h-full flex items-center justify-center pointer-events-none relative"
                                             style={{ zIndex: 100 + playerIdx }}
                                         >
                                             {/* Pulsing ring for active player */}
