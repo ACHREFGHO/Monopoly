@@ -24,7 +24,13 @@ export interface Player {
     money: number;
     inJail: boolean;
     jailTurns: number;
+    jailCards?: number;
+    doubleCount?: number;
     shape?: string;
+    skippedTurns: number;
+    nextRentPayerId: string | null;
+    landedOnItaly: boolean;
+    forcedRoll?: number | null;
 }
 
 export interface PropertyState {
@@ -63,6 +69,7 @@ interface Card {
     title: string;
     description: string;
     action: (playerId: string, get: () => GameState, set: (state: Partial<GameState> | ((state: GameState) => Partial<GameState>)) => void) => Promise<void> | void;
+    hasOptions?: boolean;
 }
 
 interface GameState {
@@ -77,7 +84,7 @@ interface GameState {
 
     // UI states
     isMoving: boolean;
-    activeCard: { title: string, description: string, type: 'chance' | 'chest' } | null;
+    activeCard: { title: string, description: string, type: 'chance' | 'chest', options?: { label: string, action: () => void }[] } | null;
     activeTrade: TradeProposal | null;
     tradeHistory: TradeProposal[];
     gameLogs: GameLog[];
@@ -117,7 +124,7 @@ interface GameState {
     respondToTrade: (accept: boolean) => void;
     sendMessage: (text: string) => void;
     endTurn: () => void;
-    initGame: (players: Omit<Player, "position" | "money" | "inJail" | "jailTurns">[], startingMoney?: number) => void;
+    initGame: (players: Omit<Player, "position" | "money" | "inJail" | "jailTurns" | "jailCards" | "doubleCount" | "skippedTurns" | "nextRentPayerId" | "landedOnItaly" | "forcedRoll">[], startingMoney?: number) => void;
     addLog: (log: Omit<GameLog, 'id' | 'timestamp'>) => void;
     setActiveModalSpaceId: (spaceId: number | null) => void;
     dismissCard: () => void;
@@ -128,6 +135,7 @@ interface GameState {
     buildHouse: (playerId: string, spaceId: number) => void;
     sellHouse: (playerId: string, spaceId: number) => void;
     postBail: (playerId: string) => void;
+    useJailCard: (playerId: string) => void;
 }
 
 // --- BOARD DEFINITION (24 properties, 3 per country) ---
@@ -195,7 +203,7 @@ const CHANCE_CARDS: Card[] = [
         }
     },
     { title: "Bank Pays Divided", description: "Receive $50", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 50; return { players: ps }; }); } },
-    { title: "Get Out of Jail Free", description: "Dismiss this encounter", action: async (id, get, set) => { /* Already handled by dismissal in UI for now */ } },
+    { title: "Get Out of Jail Free", description: "This card may be kept until needed or sold", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.jailCards = (p.jailCards || 0) + 1; return { players: ps }; }); } },
     { title: "Go Back 3 Spaces", description: "Move back 3 positions", action: async (id, get, set) => { await get().movePlayerStepByStep(id, -3); } },
     { title: "School Fees", description: "Pay $150", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 150; return { players: ps }; }); } },
     { title: "Speeding Fine", description: "Pay $15", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 15; return { players: ps }; }); } },
@@ -257,6 +265,125 @@ const CHANCE_CARDS: Card[] = [
             });
         }
     },
+    {
+        title: "Bad Connection",
+        description: "Your 'internet' went out. Skip your next turn, or pay $100 for a 'Data Roaming' pass to stay in the game.",
+        hasOptions: true,
+        action: (id, get, set) => {
+            set(s => ({
+                activeCard: {
+                    ...s.activeCard!,
+                    options: [
+                        {
+                            label: "Skip Turn",
+                            action: () => {
+                                set(st => {
+                                    const ps = [...st.players];
+                                    const idx = ps.findIndex(p => p.id === id);
+                                    if (idx > -1) ps[idx].skippedTurns = 1;
+                                    return { players: ps, activeCard: null };
+                                });
+                                get().addLog({ type: 'event', playerId: id, message: 'Chose to skip next turn due to Bad Connection' });
+                            }
+                        },
+                        {
+                            label: "Pay $100",
+                            action: () => {
+                                set(st => {
+                                    const ps = [...st.players];
+                                    const idx = ps.findIndex(p => p.id === id);
+                                    if (idx > -1) ps[idx].money -= 100;
+                                    return { players: ps, activeCard: null };
+                                });
+                                get().addLog({ type: 'event', playerId: id, message: 'Paid $100 Data Roaming fee' });
+                            }
+                        }
+                    ]
+                }
+            }));
+        }
+    },
+    {
+        title: "Identity Theft",
+        description: "You 'accidentally' used another player's credit card. Pick a player; they pay your next rent fee for you.",
+        action: (id, get, set) => {
+            const others = get().players.filter(p => p.id !== id);
+            if (others.length === 0) return;
+            const target = others[Math.floor(Math.random() * others.length)];
+            set(s => {
+                const ps = [...s.players];
+                const idx = ps.findIndex(p => p.id === id);
+                if (idx > -1) ps[idx].nextRentPayerId = target.id;
+                return { players: ps };
+            });
+            get().addLog({ type: 'event', playerId: id, message: `Identity Theft! ${others.find(p => p.id === target.id)?.name} will pay their next rent.` });
+        }
+    },
+    {
+        title: "Influencer Status",
+        description: "You reached 1M followers! Collect 50$ from every player who hasn't landed on a italien property yet.",
+        action: (id, get, set) => {
+            set(s => {
+                const ps = [...s.players];
+                const hIdx = ps.findIndex(p => p.id === id);
+                if (hIdx === -1) return s;
+                let total = 0;
+                ps.forEach(p => {
+                    if (p.id !== id && !p.landedOnItaly) {
+                        p.money -= 50;
+                        total += 50;
+                        setTimeout(() => get().addLog({ type: 'event', playerId: p.id, message: `Paid $50 to ${ps[hIdx].name} (No Italian Visa!)` }), 0);
+                    }
+                });
+                ps[hIdx].money += total;
+                return { players: ps };
+            });
+        }
+    },
+    {
+        title: "Viral Blooper",
+        description: "You posted a cringe-worthy video. Pay each player $30 to delete their screen recordings of it.",
+        action: (id, get, set) => {
+            set(s => {
+                const ps = [...s.players];
+                const pIdx = ps.findIndex(p => p.id === id);
+                if (pIdx === -1) return s;
+                ps.forEach(p => {
+                    if (p.id !== id) {
+                        p.money += 30;
+                        ps[pIdx].money -= 30;
+                        setTimeout(() => get().addLog({ type: 'event', playerId: p.id, message: `Received $30 from ${ps[pIdx].name} (Cringe Refund)` }), 0);
+                    }
+                });
+                return { players: ps };
+            });
+        }
+    },
+    {
+        title: "The Glitch",
+        description: "Choose any player (including yourself). Their next dice roll is automatically a 12.",
+        hasOptions: true,
+        action: (id, get, set) => {
+            const players = get().players;
+            set(s => ({
+                activeCard: {
+                    ...s.activeCard!,
+                    options: players.map(p => ({
+                        label: p.name,
+                        action: () => {
+                            set(st => {
+                                const ps = [...st.players];
+                                const idx = ps.findIndex(player => player.id === p.id);
+                                if (idx > -1) ps[idx].forcedRoll = 12;
+                                return { players: ps, activeCard: null };
+                            });
+                            get().addLog({ type: 'event', playerId: id, message: `The Glitch! ${p.name}'s next roll will be 12.` });
+                        }
+                    }))
+                }
+            }));
+        }
+    }
 ];
 
 const CHEST_CARDS: Card[] = [
@@ -268,6 +395,8 @@ const CHEST_CARDS: Card[] = [
     { title: "Income Tax Refund", description: "Collect $20", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 20; return { players: ps }; }); } },
     { title: "Holiday Fund Matures", description: "Receive $100", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 100; return { players: ps }; }); } },
     { title: "Go to Jail", description: "Move to Jail. Do not pass GO.", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) { p.position = 10; p.inJail = true; } return { players: ps }; }); } },
+    { title: "Bank Pays Divided", description: "Receive $50", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money += 50; return { players: ps }; }); } },
+    { title: "Get Out of Jail Free", description: "This card may be kept until needed or sold", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.jailCards = (p.jailCards || 0) + 1; return { players: ps }; }); } },
     { title: "Bank Overdraft", description: "Pay $50", action: async (id, get, set) => { set(s => { const ps = [...s.players]; const p = ps.find(p => p.id === id); if (p) p.money -= 50; return { players: ps }; }); } },
 ];
 
@@ -374,7 +503,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     initGame: (initialPlayers, startingMoney = 1500) => {
         let players: Player[] = initialPlayers.map(p => ({
-            ...p, position: 0, money: startingMoney, inJail: false, jailTurns: 0
+            ...p, position: 0, money: startingMoney, inJail: false, jailTurns: 0, jailCards: 0, doubleCount: 0, skippedTurns: 0, nextRentPayerId: null, landedOnItaly: false, forcedRoll: null
         }));
 
         if (get().rules.randomizeOrder) {
@@ -404,7 +533,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     },
 
     startAuction: (spaceId) => {
-        if (!get().rules.auctionEnabled) return;
+        if (!get().rules.auctionEnabled || get().boardState[spaceId]?.ownerId) return;
         set({
             activeAuction: {
                 spaceId,
@@ -471,9 +600,16 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (!get().rules.mortgageEnabled) return;
         set(s => {
             const bState = s.boardState[spaceId];
-            if (!bState || bState.ownerId !== playerId || bState.isMortgaged || bState.houses > 0) return s;
+            if (!bState || bState.ownerId !== playerId || bState.isMortgaged) return s;
 
             const space = BOARD_SPACES[spaceId];
+
+            // Cannot mortgage if ANY property in the set has houses
+            if (space.country) {
+                const countryProps = BOARD_SPACES.filter(sp => sp.country === space.country);
+                const hasHousesInSet = countryProps.some(sp => s.boardState[sp.id]?.houses > 0);
+                if (hasHousesInSet) return s;
+            }
             const mortgageValue = Math.floor((space.price || 0) / 2);
 
             const players = [...s.players];
@@ -548,18 +684,77 @@ export const useGameStore = create<GameState>((set, get) => ({
         if (get().isMoving || get().activeCard || get().activeModalSpaceId !== null || get().hasRolled) return;
         set({ isMoving: true });
 
-        const d1 = Math.floor(Math.random() * 6) + 1;
-        const d2 = Math.floor(Math.random() * 6) + 1;
+        const store = get();
+        const currentPlayer = store.players[store.currentTurn];
+
+        let d1, d2;
+        if (currentPlayer.forcedRoll === 12) {
+            d1 = 6;
+            d2 = 6;
+            set(s => {
+                const ps = [...s.players];
+                const idx = ps.findIndex(p => p.id === currentPlayer.id);
+                if (idx > -1) ps[idx].forcedRoll = null;
+                return { players: ps };
+            });
+        } else {
+            d1 = Math.floor(Math.random() * 6) + 1;
+            d2 = Math.floor(Math.random() * 6) + 1;
+        }
+
         const isDouble = d1 === d2;
         set({ diceRoll: [d1, d2] });
 
         // Wait to show dice roll
         await new Promise(resolve => setTimeout(resolve, 800));
 
-        const store = get();
-        const currentPlayer = store.players[store.currentTurn];
+        if (currentPlayer.skippedTurns > 0) {
+            set(s => {
+                const ps = [...s.players];
+                const idx = ps.findIndex(p => p.id === currentPlayer.id);
+                if (idx > -1) ps[idx].skippedTurns -= 1;
+                return { players: ps, hasRolled: true };
+            });
+            setTimeout(() => {
+                get().addLog({
+                    type: 'event',
+                    playerId: currentPlayer.id,
+                    message: `Turn skipped due to bad data connection!`
+                });
+            }, 0);
+            set({ isMoving: false });
+            return;
+        }
+
         if (!currentPlayer.inJail) {
-            set({ hasRolled: !isDouble });
+            // Three doubles = Jail
+            let dc = currentPlayer.doubleCount || 0;
+            if (isDouble) {
+                dc += 1;
+                if (dc >= 3) {
+                    set(s => {
+                        const ps = [...s.players];
+                        const idx = ps.findIndex(p => p.id === currentPlayer.id);
+                        if (idx > -1) {
+                            ps[idx] = { ...ps[idx], position: 10, inJail: true, jailTurns: 0, doubleCount: 0 };
+                            get().addLog({ type: 'jail', playerId: currentPlayer.id, message: 'Three doubles in a row! Sent to JAIL!' });
+                        }
+                        return { players: ps, hasRolled: true };
+                    });
+                    set({ isMoving: false });
+                    return;
+                }
+            } else {
+                dc = 0;
+            }
+
+            set(s => {
+                const ps = [...s.players];
+                const idx = ps.findIndex(p => p.id === currentPlayer.id);
+                if (idx > -1) ps[idx].doubleCount = dc;
+                return { players: ps, hasRolled: !isDouble };
+            });
+
             await store.movePlayerStepByStep(currentPlayer.id, d1 + d2);
         } else {
             // Free from jail on doubles
@@ -567,26 +762,42 @@ export const useGameStore = create<GameState>((set, get) => ({
                 set(s => {
                     const ps = [...s.players];
                     const idx = ps.findIndex(p => p.id === currentPlayer.id);
-                    if (idx > -1) ps[idx] = { ...ps[idx], inJail: false, jailTurns: 0 };
+                    if (idx > -1) ps[idx] = { ...ps[idx], inJail: false, jailTurns: 0, doubleCount: 0 };
                     return { players: ps, hasRolled: true };
                 });
                 await get().movePlayerStepByStep(currentPlayer.id, d1 + d2);
             } else {
+                let mustMove = false;
                 set(s => {
                     const ps = [...s.players];
                     const idx = ps.findIndex(p => p.id === currentPlayer.id);
                     if (idx > -1) {
                         const newTurns = ps[idx].jailTurns + 1;
                         if (newTurns >= 3) {
-                            ps[idx] = { ...ps[idx], inJail: false, jailTurns: 0 };
+                            // MUST PAY $50 AND MOVE
+                            ps[idx] = { ...ps[idx], money: ps[idx].money - 50, inJail: false, jailTurns: 0, doubleCount: 0 };
+                            mustMove = true;
+                            setTimeout(() => {
+                                get().addLog({
+                                    type: 'bail',
+                                    playerId: currentPlayer.id,
+                                    amount: 50,
+                                    message: `Third failed roll in jail - Forced $50 bail`
+                                });
+                            }, 0);
                         } else {
                             ps[idx] = { ...ps[idx], jailTurns: newTurns };
                         }
                     }
                     return { players: ps, hasRolled: true };
                 });
+
+                if (mustMove) {
+                    await get().movePlayerStepByStep(currentPlayer.id, d1 + d2);
+                }
             }
         }
+        set({ isMoving: false });
     },
 
     movePlayerStepByStep: async (playerId, steps) => {
@@ -618,6 +829,8 @@ export const useGameStore = create<GameState>((set, get) => ({
                 }
 
                 player.position = nextPos;
+                if ([21, 23, 24].includes(nextPos)) player.landedOnItaly = true;
+
                 players[pIdx] = player;
                 return { players };
             });
@@ -730,12 +943,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
                 let rentAmount = 0;
                 if (space.type === 'property' && space.rent) {
-                    const ownerProps = BOARD_SPACES.filter(s =>
-                        s.country === space.country &&
-                        state.boardState[s.id]?.ownerId === bState.ownerId
-                    );
-                    const totalInCountry = BOARD_SPACES.filter(s => s.country === space.country).length;
-                    const hasMonopoly = ownerProps.length === totalInCountry;
+                    const countryProps = BOARD_SPACES.filter(s => s.country === space.country);
+                    const ownerProps = countryProps.filter(s => state.boardState[s.id]?.ownerId === bState.ownerId);
+
+                    // Monopoly only counts if ALL properties are owned AND NONE are mortgaged
+                    const hasMonopoly = ownerProps.length === countryProps.length && ownerProps.every(s => !state.boardState[s.id]?.isMortgaged);
 
                     if (bState.houses === 0) {
                         const multiplier = (hasMonopoly && state.rules.doubleRentOnSets) ? 2 : 1;
@@ -749,11 +961,12 @@ export const useGameStore = create<GameState>((set, get) => ({
                     ).length;
                     rentAmount = [0, 25, 50, 100, 200][stationsOwned] || 0;
                 } else if (space.type === 'utility' && state.diceRoll) {
-                    const utilOwned = BOARD_SPACES.filter(s =>
-                        s.type === 'utility' && state.boardState[s.id]?.ownerId === bState.ownerId
-                    ).length;
+                    const countryUtils = BOARD_SPACES.filter(s => s.type === 'utility');
+                    const ownerUtils = countryUtils.filter(s => state.boardState[s.id]?.ownerId === bState.ownerId);
+                    const unmortgagedCount = ownerUtils.filter(s => !state.boardState[s.id]?.isMortgaged).length;
+
                     const rollTotal = state.diceRoll[0] + state.diceRoll[1];
-                    rentAmount = utilOwned === 2 ? rollTotal * 10 : rollTotal * 4;
+                    rentAmount = unmortgagedCount === 2 ? rollTotal * 10 : rollTotal * 4;
                 }
 
                 if (rentAmount > 0) {
@@ -770,7 +983,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     buyProperty: (playerId, spaceId) => {
         set(state => {
             const space = BOARD_SPACES[spaceId];
-            if (!space || typeof space.price !== 'number') return state;
+            if (!space || typeof space.price !== 'number' || state.boardState[spaceId]?.ownerId) return state;
 
             const players = [...state.players];
             const pIdx = players.findIndex(p => p.id === playerId);
@@ -812,18 +1025,38 @@ export const useGameStore = create<GameState>((set, get) => ({
             const players = [...state.players];
             const fromIdx = players.findIndex(p => p.id === fromPlayerId);
             const toIdx = players.findIndex(p => p.id === toPlayerId);
+
             if (fromIdx !== -1 && toIdx !== -1) {
-                players[fromIdx] = { ...players[fromIdx], money: players[fromIdx].money - amount };
-                players[toIdx] = { ...players[toIdx], money: players[toIdx].money + amount };
-                setTimeout(() => {
-                    get().addLog({
-                        type: 'rent',
-                        playerId: fromPlayerId,
-                        targetPlayerId: toPlayerId,
-                        amount,
-                        message: `Paid $${amount} rent`
-                    });
-                }, 0);
+                const proxyId = players[fromIdx].nextRentPayerId;
+                const actualFromIdx = proxyId ? players.findIndex(p => p.id === proxyId) : fromIdx;
+
+                if (actualFromIdx !== -1) {
+                    players[actualFromIdx].money -= amount;
+                    players[toIdx].money += amount;
+
+                    if (proxyId) {
+                        players[fromIdx].nextRentPayerId = null;
+                        setTimeout(() => {
+                            get().addLog({
+                                type: 'rent',
+                                playerId: proxyId,
+                                targetPlayerId: toPlayerId,
+                                amount,
+                                message: `Paid $${amount} rent on behalf of ${players[fromIdx].name} (Identity Theft!)`
+                            });
+                        }, 0);
+                    } else {
+                        setTimeout(() => {
+                            get().addLog({
+                                type: 'rent',
+                                playerId: fromPlayerId,
+                                targetPlayerId: toPlayerId,
+                                amount,
+                                message: `Paid $${amount} rent`
+                            });
+                        }, 0);
+                    }
+                }
             }
             return { players };
         });
@@ -845,22 +1078,25 @@ export const useGameStore = create<GameState>((set, get) => ({
             const pIdx = players.findIndex(p => p.id === playerId);
             if (pIdx === -1 || players[pIdx].money < space.housePrice) return state;
 
-            if (state.monopolyRequiredToBuild) {
-                const totalInCountry = BOARD_SPACES.filter(s => s.country === space.country).length;
-                const ownedInCountry = BOARD_SPACES.filter(s =>
-                    s.country === space.country &&
-                    state.boardState[s.id]?.ownerId === playerId
-                ).length;
+            if (state.monopolyRequiredToBuild || state.rules.evenBuild) {
+                const countryProps = BOARD_SPACES.filter(s => s.country === space.country);
 
-                if (ownedInCountry < totalInCountry) return state;
+                const hasMortgageInSet = countryProps.some(s => state.boardState[s.id]?.isMortgaged);
+                if (hasMortgageInSet) return state;
+
+                if (state.monopolyRequiredToBuild) {
+                    const ownedInCountry = countryProps.filter(s => state.boardState[s.id]?.ownerId === playerId).length;
+                    if (ownedInCountry < countryProps.length) return state;
+                }
             }
 
             if (state.rules.evenBuild) {
                 const countryProps = BOARD_SPACES.filter(s => s.country === space.country);
+                const ownedPropsInSet = countryProps.filter(s => state.boardState[s.id]?.ownerId === playerId);
                 const currentHouses = propertyState.houses;
-                const otherPropsInSet = countryProps.filter(s => s.id !== spaceId);
+                const otherOwnedProps = ownedPropsInSet.filter(s => s.id !== spaceId);
 
-                const canBuild = otherPropsInSet.every(s => {
+                const canBuild = otherOwnedProps.every(s => {
                     const st = state.boardState[s.id];
                     return st && st.houses >= currentHouses;
                 });
@@ -897,10 +1133,11 @@ export const useGameStore = create<GameState>((set, get) => ({
 
             if (state.rules.evenBuild) {
                 const countryProps = BOARD_SPACES.filter(s => s.country === space.country);
+                const ownedPropsInSet = countryProps.filter(s => state.boardState[s.id]?.ownerId === playerId);
                 const currentHouses = propertyState.houses;
-                const otherPropsInSet = countryProps.filter(s => s.id !== spaceId);
+                const otherOwnedProps = ownedPropsInSet.filter(s => s.id !== spaceId);
 
-                const canSell = otherPropsInSet.every(s => {
+                const canSell = otherOwnedProps.every(s => {
                     const st = state.boardState[s.id];
                     return st && st.houses <= currentHouses;
                 });
@@ -938,13 +1175,30 @@ export const useGameStore = create<GameState>((set, get) => ({
             const pIdx = players.findIndex(p => p.id === playerId);
             if (pIdx === -1 || !players[pIdx].inJail || players[pIdx].money < 100) return state;
 
-            players[pIdx] = { ...players[pIdx], money: players[pIdx].money - 100, inJail: false, jailTurns: 0 };
+            players[pIdx] = { ...players[pIdx], money: players[pIdx].money - 100, inJail: false, jailTurns: 0, doubleCount: 0 };
             setTimeout(() => {
                 get().addLog({
                     type: 'bail',
                     playerId,
                     amount: 100,
                     message: `Paid $100 bail`
+                });
+            }, 0);
+            return { players };
+        });
+    },
+    useJailCard: (playerId: string) => {
+        set(state => {
+            const players = [...state.players];
+            const pIdx = players.findIndex(p => p.id === playerId);
+            if (pIdx === -1 || !players[pIdx].inJail || (players[pIdx].jailCards || 0) <= 0) return state;
+
+            players[pIdx] = { ...players[pIdx], jailCards: (players[pIdx].jailCards || 0) - 1, inJail: false, jailTurns: 0, doubleCount: 0 };
+            setTimeout(() => {
+                get().addLog({
+                    type: 'bail',
+                    playerId,
+                    message: `Used a "Get Out of Jail Free" card`
                 });
             }, 0);
             return { players };
@@ -958,3 +1212,4 @@ export const useGameStore = create<GameState>((set, get) => ({
         });
     }
 }));
+

@@ -4,7 +4,7 @@ import { useGameStore, BOARD_SPACES } from '../../store/useGameStore';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
-import { Car, Zap, Droplets, Plane, Play, Lock, Siren, Send, ArrowRight, Sparkles, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Coins, Palmtree, Gavel, Home, DollarSign, Shuffle, RefreshCw, Volume2, VolumeX, Volume1 } from 'lucide-react';
+import { Car, Zap, Droplets, Plane, Play, Lock, Key, Siren, Send, ArrowRight, Sparkles, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Coins, Palmtree, Gavel, Home, DollarSign, Shuffle, RefreshCw, Volume2, VolumeX, Volume1 } from 'lucide-react';
 import { useTexture } from '@react-three/drei';
 
 const getGridArea = (id: number) => {
@@ -85,22 +85,21 @@ const TOKEN_SHAPES: Record<string, (color: string, size: number) => React.ReactN
             <rect x="33" y="24" width="4" height="3" rx="1" fill="#ff4444" opacity="0.8" />
         </svg>
     ),
-    horse: (color, s) => (
+    rocket: (color, s) => (
         <svg width={s} height={s} viewBox="0 0 40 40" fill="none">
             <defs>
-                <radialGradient id={`hg-${color}`} cx="50%" cy="30%" r="70%">
+                <linearGradient id={`rg-${color}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={color} />
                     <stop offset="100%" stopColor={color} stopOpacity="0.5" />
-                </radialGradient>
+                </linearGradient>
             </defs>
-            <ellipse cx="20" cy="28" rx="10" ry="6" fill={`url(#hg-${color})`} />
-            <rect x="15" y="18" width="10" height="14" rx="3" fill={color} />
-            <ellipse cx="22" cy="14" rx="8" ry="7" fill={color} />
-            <path d="M26 10 Q32 6 30 4 Q28 8 26 10" fill={color} />
-            <circle cx="19" cy="12" r="1.5" fill="#111" />
-            <ellipse cx="18" cy="10" rx="2" ry="1" fill="white" opacity="0.3" />
-            <rect x="14" y="30" width="3" height="7" rx="1.5" fill={color} opacity="0.8" />
-            <rect x="23" y="30" width="3" height="7" rx="1.5" fill={color} opacity="0.8" />
+            <path d="M20 5 Q28 15 25 25 L25 32 L15 32 L15 25 Q12 15 20 5" fill={`url(#rg-${color})`} stroke={color} strokeWidth="1" />
+            <path d="M15 25 L8 35 L15 30 Z" fill={color} opacity="0.8" />
+            <path d="M25 25 L32 35 L25 30 Z" fill={color} opacity="0.8" />
+            <circle cx="20" cy="16" r="3" fill="#D1FAE5" opacity="0.9" />
+            <path d="M18 32 L20 39 L22 32" fill="#F87171" opacity="0.9">
+                <animate attributeName="opacity" values="0.9;0.4;0.9" dur="0.2s" repeatCount="Indefinite" />
+            </path>
         </svg>
     ),
     hat: (color, s) => (
@@ -493,25 +492,27 @@ const Dice3D = ({ value, rolling }: { value: number, rolling: boolean }) => {
 };
 
 const RuleToggle = ({ icon: Icon, title, description, value, onChange }: { icon: any, title: string, description: string, value: boolean, onChange: (v: boolean) => void }) => (
-    <div className="flex items-center gap-4 px-5 py-4 group hover:bg-white/[0.02] transition-colors">
-        <div className="w-12 h-12 rounded-2xl bg-[#1A1625] border border-white/5 flex items-center justify-center text-slate-400 group-hover:bg-[#CBB26A]/10 group-hover:text-[#CBB26A] transition-colors shrink-0 shadow-lg">
+    <div
+        className="flex items-center gap-4 px-5 py-5 group hover:bg-white/[0.03] transition-all duration-300 border-b border-white/[0.02] last:border-0 cursor-pointer"
+        onClick={() => onChange(!value)}
+    >
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shrink-0 shadow-lg border ${value ? 'bg-[#CBB26A]/20 text-[#CBB26A] border-[#CBB26A]/30' : 'bg-[#1A1625] border-white/5 text-slate-500 group-hover:text-slate-300'}`}>
             <Icon size={20} />
         </div>
         <div className="flex-1 flex flex-col min-w-0">
-            <span className="text-[14px] font-black text-white mb-0.5 tracking-tight">{title}</span>
-            <span className="text-[11px] text-slate-500 font-bold leading-tight line-clamp-2 tracking-wide">{description}</span>
+            <span className={`text-[13px] font-black mb-1 ml-0.5 tracking-tight transition-colors duration-300 ${value ? 'text-[#CBB26A]' : 'text-slate-100'}`}>{title}</span>
+            <span className="text-[10px] text-slate-500 font-bold leading-relaxed tracking-wider transition-colors duration-300 group-hover:text-slate-400 pl-0.5">{description}</span>
         </div>
-        <button
-            onClick={() => onChange(!value)}
-            className={`w-14 h-7 rounded-full relative transition-all duration-500 shrink-0 ${value ? 'bg-[#CBB26A]' : 'bg-[#1A1625] border border-white/10'}`}
+        <div
+            className={`w-11 h-6 rounded-full relative transition-all duration-500 shrink-0 ${value ? 'bg-[#CBB26A] shadow-[0_0_15px_rgba(203,178,106,0.3)]' : 'bg-black/40 border border-white/10'}`}
         >
             <motion.div
-                animate={{ x: value ? 28 : 4 }}
+                animate={{ x: value ? 22 : 2 }}
                 initial={false}
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                className="absolute top-1 w-5 h-5 rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
+                className={`absolute top-1 w-4 h-4 rounded-full shadow-lg ${value ? 'bg-white' : 'bg-slate-600'}`}
             />
-        </button>
+        </div>
     </div>
 );
 
@@ -690,7 +691,7 @@ export const Board = () => {
                                         <option value="cube">Cube Token</option>
                                         <option value="cylinder">Cylinder Token</option>
                                         <option value="car">Car Token</option>
-                                        <option value="horse">Horse Token</option>
+                                        <option value="rocket">Rocket Token</option>
                                         <option value="hat">Top Hat Token</option>
                                         <option value="ship">Ship Token</option>
                                         <option value="cone">Cone Token</option>
@@ -1078,11 +1079,15 @@ export const Board = () => {
                                         style={{ background: 'radial-gradient(circle at center, rgba(203,178,106,0.08) 0%, transparent 70%)' }}
                                     />
                                     {/* Quick Build Controls - Hover and Owned by current player */}
-                                    {space.type === 'property' && bState?.ownerId === players[currentTurn]?.id && hoveredSpaceId === id && !bState?.isMortgaged && (
+                                    {space.type === 'property' && players[currentTurn] && bState?.ownerId === players[currentTurn].id && hoveredSpaceId === id && !bState?.isMortgaged && (
                                         (() => {
+                                            const currentPlayerId = players[currentTurn]?.id;
+                                            if (!currentPlayerId) return false;
                                             const countryProps = BOARD_SPACES.filter(s => s.country === space.country);
-                                            const hasMonopoly = countryProps.length > 0 && countryProps.every(s => boardState[s.id]?.ownerId === players[currentTurn]?.id);
-                                            return hasMonopoly;
+                                            const countProps = BOARD_SPACES.filter(s => s.country === space.country);
+                                            const hasMonopoly = countProps.every(s => boardState[s.id]?.ownerId === players[currentTurn].id);
+                                            const hasMortgageInSet = countProps.some(s => boardState[s.id]?.isMortgaged);
+                                            return hasMonopoly && !hasMortgageInSet;
                                         })()
                                     ) && (
                                             <motion.div
@@ -1091,14 +1096,14 @@ export const Board = () => {
                                                 className="absolute inset-0 z-[60] flex flex-col items-center justify-between p-0.5 bg-black/60 backdrop-blur-md rounded-[inherit] overflow-hidden"
                                             >
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); buildHouse(players[currentTurn].id, id); }}
+                                                    onClick={(e) => { e.stopPropagation(); buildHouse(players[currentTurn]?.id, id); }}
                                                     className="w-full flex-1 flex items-center justify-center hover:bg-emerald-500/40 text-emerald-400 transition-all border-b border-white/10 group/btn"
                                                     title="Build House"
                                                 >
                                                     <ChevronUp size={28} className="drop-shadow-[0_0_8px_currentColor] group-hover/btn:scale-125 transition-transform" />
                                                 </button>
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); sellHouse(players[currentTurn].id, id); }}
+                                                    onClick={(e) => { e.stopPropagation(); sellHouse(players[currentTurn]?.id, id); }}
                                                     className="w-full flex-1 flex items-center justify-center hover:bg-rose-500/40 text-rose-400 transition-all group/btn"
                                                     title="Sell House"
                                                 >
@@ -1429,15 +1434,15 @@ export const Board = () => {
                                     transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
                                     className="absolute top-[55%] inset-x-0 mx-auto w-fit text-center font-black text-white pointer-events-auto flex items-center gap-4 bg-white/5 backdrop-blur-xl px-10 py-4 rounded-3xl border border-white/10 text-xs sm:text-sm shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
                                 >
-                                    <div className="w-3 h-3 rounded-full shadow-[0_0_15px_currentColor] animate-pulse" style={{ backgroundColor: players[currentTurn].color, color: players[currentTurn].color }} />
-                                    <span className="tracking-[0.2em] uppercase">{players[currentTurn].name}'s Turn</span>
+                                    <div className="w-3 h-3 rounded-full shadow-[0_0_15px_currentColor] animate-pulse" style={{ backgroundColor: players[currentTurn]?.color || '#fff', color: players[currentTurn]?.color || '#fff' }} />
+                                    <span className="tracking-[0.2em] uppercase">{players[currentTurn]?.name || 'Player'}'s Turn</span>
                                 </motion.div>
                             )}
 
                             <div className="absolute bottom-[8%] flex flex-col items-center gap-4 pointer-events-auto w-full px-12">
-                                {players.length > 0 && !boardState[players[currentTurn].position]?.ownerId && ['property', 'station', 'utility'].includes(BOARD_SPACES[players[currentTurn].position].type) && hasRolled && !isMoving && (
+                                {players[currentTurn] && !boardState[players[currentTurn].position]?.ownerId && ['property', 'station', 'utility'].includes(BOARD_SPACES[players[currentTurn].position].type) && hasRolled && !isMoving && (
                                     <button
-                                        onClick={() => buyProperty(players[currentTurn].id, players[currentTurn].position)}
+                                        onClick={() => buyProperty(players[currentTurn]?.id, players[currentTurn]?.position)}
                                         className="w-full max-w-xs py-4 rounded-full font-black text-[10px] sm:text-xs tracking-[0.4em] bg-emerald-500 text-white hover:bg-emerald-400 hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] flex items-center justify-center gap-4 group border border-emerald-400/20"
                                     >
                                         ACQUIRE ASSET <div className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-[10px] text-white">$</div>
@@ -1446,11 +1451,11 @@ export const Board = () => {
 
                                 {players.length > 0 && (
                                     <div className="flex flex-row gap-2 sm:gap-4 lg:gap-6 w-full justify-center">
-                                        {players[currentTurn].inJail && !hasRolled && players[currentTurn].money >= 100 && (
+                                        {players[currentTurn]?.inJail && !hasRolled && players[currentTurn].money >= 100 && (
                                             <motion.button
                                                 whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(244,63,94,0.4)" }}
                                                 whileTap={{ scale: 0.95 }}
-                                                onClick={() => postBail(players[currentTurn].id)}
+                                                onClick={() => postBail(players[currentTurn]?.id)}
                                                 className={`
                                                     flex-1 max-w-[150px] sm:max-w-[180px] h-14 sm:h-16 rounded-2xl font-black text-[9px] sm:text-[10px] sm:tracking-[0.2em] uppercase 
                                                     transition-all duration-300 relative overflow-hidden group
@@ -1461,6 +1466,25 @@ export const Board = () => {
                                                 <div className="relative flex items-center justify-center gap-1 sm:gap-2 h-full">
                                                     <span className="drop-shadow-sm text-center">PAY $100<br className="sm:hidden" /> BAIL</span>
                                                     <Lock size={14} className="hidden sm:block" />
+                                                </div>
+                                            </motion.button>
+                                        )}
+
+                                        {players[currentTurn]?.inJail && !hasRolled && (players[currentTurn].jailCards || 0) > 0 && (
+                                            <motion.button
+                                                whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(16,185,129,0.4)" }}
+                                                whileTap={{ scale: 0.95 }}
+                                                onClick={() => useGameStore.getState().useJailCard(players[currentTurn]?.id)}
+                                                className={`
+                                                    flex-1 max-w-[150px] sm:max-w-[180px] h-14 sm:h-16 rounded-2xl font-black text-[9px] sm:text-[10px] sm:tracking-[0.2em] uppercase 
+                                                    transition-all duration-300 relative overflow-hidden group
+                                                    bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-800 text-white shadow-[0_10px_20px_rgba(16,185,129,0.3)] cursor-pointer
+                                                `}
+                                            >
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-[120%] group-hover:animate-[shimmer_1.5s_infinite] skew-x-12" />
+                                                <div className="relative flex items-center justify-center gap-1 sm:gap-2 h-full">
+                                                    <span className="drop-shadow-sm text-center">USE<br className="sm:hidden" /> CARD</span>
+                                                    <Key size={14} className="hidden sm:block" />
                                                 </div>
                                             </motion.button>
                                         )}
@@ -1520,6 +1544,7 @@ export const Board = () => {
                             <AnimatePresence>
                                 {activeModalSpaceId !== null && (
                                     <motion.div
+                                        key="purchase-modal"
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.8 }}
@@ -1593,13 +1618,17 @@ export const Board = () => {
                                                     );
                                                 }
 
+                                                const countryProps = BOARD_SPACES.filter(s => s.country === space.country);
+                                                const hasMortgageInSet = countryProps.some(s => boardState[s.id]?.isMortgaged);
+                                                const hasHousesInSet = countryProps.some(s => boardState[s.id]?.houses > 0);
+
                                                 if (space.type !== 'property' || bState.houses >= 5) {
                                                     return (
                                                         <div className="flex flex-col gap-2 w-full mb-4">
                                                             <div className="w-full py-4 rounded-2xl bg-white/5 border border-[#CBB26A]/20 text-[#CBB26A] text-center text-xs font-black uppercase tracking-widest font-bold">
                                                                 {bState.houses >= 5 ? 'ASSET MAXED OUT (HOTEL)' : 'YOU OWN THIS ASSET'}
                                                             </div>
-                                                            {rules.mortgageEnabled && bState.houses === 0 && (
+                                                            {rules.mortgageEnabled && !hasHousesInSet && (
                                                                 <button
                                                                     onClick={() => useGameStore.getState().mortgageProperty(player.id, activeModalSpaceId)}
                                                                     className="w-full py-3 rounded-2xl border border-rose-500/30 text-rose-500/80 hover:text-rose-400 hover:bg-rose-500/5 font-black text-xs tracking-[0.2em] transition-all"
@@ -1619,15 +1648,16 @@ export const Board = () => {
                                                     failReason = "Not enough money";
                                                 }
 
+                                                if (canBuild && hasMortgageInSet) {
+                                                    canBuild = false;
+                                                    failReason = "One city is mortgaged";
+                                                }
+
                                                 if (canBuild && monopolyRequiredToBuild) {
-                                                    const totalInCountry = BOARD_SPACES.filter(s => s.country === space.country).length;
-                                                    const ownedInCountry = BOARD_SPACES.filter(s =>
-                                                        s.country === space.country &&
-                                                        boardState[s.id]?.ownerId === player.id
-                                                    ).length;
-                                                    if (ownedInCountry < totalInCountry) {
+                                                    const ownedInCountry = countryProps.filter(s => boardState[s.id]?.ownerId === player.id).length;
+                                                    if (ownedInCountry < countryProps.length) {
                                                         canBuild = false;
-                                                        failReason = `Need all ${totalInCountry} cities`;
+                                                        failReason = `Need all cities`;
                                                     }
                                                 }
 
@@ -1679,6 +1709,7 @@ export const Board = () => {
 
                                 {activeCard && (
                                     <motion.div
+                                        key="card-modal"
                                         initial={{ opacity: 0, scale: 0.8, y: 50, rotateX: 45 }}
                                         animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
                                         exit={{ opacity: 0, scale: 0.8, y: -50, rotateX: -45 }}
@@ -1695,17 +1726,32 @@ export const Board = () => {
                                         <h2 className="text-2xl font-black text-white mb-2 leading-tight tracking-tight">{activeCard.title}</h2>
                                         <p className="text-slate-400 font-bold text-sm mb-10 px-4 leading-relaxed italic border-t border-white/5 pt-4">"{activeCard.description}"</p>
 
-                                        <button
-                                            onClick={() => useGameStore.getState().dismissCard()}
-                                            className={`w-full py-4 rounded-2xl font-black text-sm tracking-[0.2em] transition-all hover:scale-105 active:scale-95 shadow-xl ${activeCard.type === 'chance' ? 'bg-[#EAB308] text-[#0A0810] hover:bg-[#FACC15]' : 'bg-[#38BDF8] text-[#0A0810] hover:bg-[#7DD3FC]'}`}
-                                        >
-                                            ACKNOWLEDGE
-                                        </button>
+                                        {activeCard.options ? (
+                                            <div className="flex flex-col gap-3 w-full">
+                                                {activeCard.options.map((opt, i) => (
+                                                    <button
+                                                        key={i}
+                                                        onClick={() => opt.action()}
+                                                        className={`w-full py-4 rounded-xl font-black text-[10px] tracking-[0.2em] transition-all hover:scale-105 active:scale-95 shadow-lg ${activeCard.type === 'chance' ? 'bg-[#EAB308] text-black hover:bg-[#FACC15]' : 'bg-[#38BDF8] text-black hover:bg-[#7DD3FC]'}`}
+                                                    >
+                                                        {opt.label.toUpperCase()}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => useGameStore.getState().dismissCard()}
+                                                className={`w-full py-4 rounded-2xl font-black text-sm tracking-[0.2em] transition-all hover:scale-105 active:scale-95 shadow-xl ${activeCard.type === 'chance' ? 'bg-[#EAB308] text-[#0A0810] hover:bg-[#FACC15]' : 'bg-[#38BDF8] text-[#0A0810] hover:bg-[#7DD3FC]'}`}
+                                            >
+                                                ACKNOWLEDGE
+                                            </button>
+                                        )}
                                     </motion.div>
                                 )}
 
                                 {activeAuction && (
                                     <motion.div
+                                        key="auction-modal"
                                         initial={{ opacity: 0, scale: 0.9, y: 20 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -1797,6 +1843,31 @@ export const Board = () => {
                             {tempPlayers.length === 0 ? "Waiting for players..." : tempPlayers.length < 2 ? "Waiting for players..." : "Ready to start!"}
                         </div>
                         <div className="p-4 sm:p-6 flex-1 flex flex-col gap-6">
+                            {/* NEW: Starting Cash at the very top */}
+                            <div className="space-y-4">
+                                <div className="flex flex-col">
+                                    <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Starting Capital</h3>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Initial bank balance for all players</p>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {[1500, 2000, 2500, 3000, 3500, 4000].map(val => (
+                                        <button
+                                            key={val}
+                                            onClick={() => setStartMoney(val)}
+                                            className={`py-3 rounded-xl border text-xs font-mono font-bold transition-all
+                                                ${startMoney === val
+                                                    ? 'bg-[#CBB26A] border-[#CBB26A] text-[#0A0810] shadow-[0_0_20px_rgba(203,178,106,0.2)] scale-105 z-10'
+                                                    : 'bg-[#0E0B16] border-[#2A2438] text-slate-400 hover:border-slate-600'
+                                                }`}
+                                        >
+                                            ${val}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="h-px bg-white/5 w-full my-2" />
+
                             {/* Added Players preview list */}
                             {tempPlayers.length > 0 && (
                                 <div className="flex flex-col gap-2 bg-[#0E0B16] p-4 rounded-2xl border border-[#2A2438]">
@@ -1827,47 +1898,49 @@ export const Board = () => {
                             <div>
                                 <div className="text-xs font-bold text-white mb-4 bg-[#2A2438] py-2 px-3 rounded-lg text-center uppercase tracking-widest shadow-inner">Game settings</div>
                                 <div className="flex flex-col gap-4 px-2">
-                                    <div className="flex justify-between items-center bg-[#0E0B16] p-3 rounded-2xl border border-white/5">
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-bold text-slate-200">Dice Theme</span>
-                                            <span className="text-[10px] text-slate-500 font-medium">Select your lucky dice</span>
+                                    <div className="flex flex-col bg-[#0E0B16] rounded-2xl border border-white/5 divide-y divide-white/[0.03] overflow-hidden">
+                                        <div className="flex justify-between items-center px-5 py-4 group hover:bg-white/[0.02] transition-colors cursor-pointer" onClick={() => setDicePreference(dicePreference === 'white' ? 'red' : 'white')}>
+                                            <div className="flex flex-col">
+                                                <span className="text-[13px] font-black text-slate-100 tracking-tight">Dice Palette</span>
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Lucky colors</span>
+                                            </div>
+                                            <div className="flex bg-black/40 p-1 rounded-xl border border-white/10 shrink-0">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setDicePreference('white'); }}
+                                                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${dicePreference === 'white' ? 'bg-[#CBB26A] text-[#0A0810] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                                >
+                                                    WHITE
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setDicePreference('red'); }}
+                                                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${dicePreference === 'red' ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                                >
+                                                    RED
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
-                                            <button
-                                                onClick={() => setDicePreference('white')}
-                                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${dicePreference === 'white' ? 'bg-[#CBB26A] text-[#0A0810] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                                            >
-                                                WHITE
-                                            </button>
-                                            <button
-                                                onClick={() => setDicePreference('red')}
-                                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${dicePreference === 'red' ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                                            >
-                                                RED
-                                            </button>
+                                        <div className="flex justify-between items-center px-5 py-4 group hover:bg-white/[0.02] transition-colors cursor-pointer" onClick={() => setMonopolyRequiredToBuild(!monopolyRequiredToBuild)}>
+                                            <div className="flex flex-col">
+                                                <span className="text-[13px] font-black text-slate-100 tracking-tight">Build Strategy</span>
+                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Freedom vs Rule</span>
+                                            </div>
+                                            <div className="flex bg-black/40 p-1 rounded-xl border border-white/10 shrink-0">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setMonopolyRequiredToBuild(false); }}
+                                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black transition-all ${!monopolyRequiredToBuild ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                                >
+                                                    FREE
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setMonopolyRequiredToBuild(true); }}
+                                                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black transition-all ${monopolyRequiredToBuild ? 'bg-[#CBB26A] text-[#0A0810] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                                >
+                                                    MONOPOLY
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex justify-between items-center bg-[#0E0B16] p-3 rounded-2xl border border-white/5">
-                                        <div className="flex flex-col">
-                                            <span className="text-xs font-bold text-slate-200">Building Rules</span>
-                                            <span className="text-[10px] text-slate-500 font-medium">Free Build vs Monopoly</span>
-                                        </div>
-                                        <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
-                                            <button
-                                                onClick={() => setMonopolyRequiredToBuild(false)}
-                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black transition-all ${!monopolyRequiredToBuild ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                                            >
-                                                FREE
-                                            </button>
-                                            <button
-                                                onClick={() => setMonopolyRequiredToBuild(true)}
-                                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black transition-all ${monopolyRequiredToBuild ? 'bg-[#CBB26A] text-[#0A0810] shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                                            >
-                                                MONOPOLY
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 mt-6 px-1">Gameplay rules</div>
+                                    <div className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 mt-8 px-1">Gameplay rules</div>
                                     <div className="flex flex-col bg-[#0E0B16] rounded-2xl border border-white/5 divide-y divide-white/5 overflow-hidden">
                                         <RuleToggle
                                             icon={Coins}
@@ -1920,26 +1993,7 @@ export const Board = () => {
                                         />
                                     </div>
 
-                                    <div className="flex justify-between items-center mt-8 px-2 mb-2">
-                                        <div className="flex flex-col">
-                                            <span className="text-lg font-black text-white tracking-tighter">Starting cash</span>
-                                            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-widest">Initial bank balance</span>
-                                        </div>
-                                        <div className="relative">
-                                            <select
-                                                value={startMoney}
-                                                onChange={e => setStartMoney(Number(e.target.value))}
-                                                className="bg-[#1A1625] border border-white/10 rounded-2xl px-6 py-3 text-sm font-mono font-black text-white outline-none focus:border-[#CBB26A] shadow-2xl cursor-pointer appearance-none pr-10 transition-all hover:bg-[#231E32]"
-                                            >
-                                                {[1500, 2000, 2500, 3000, 3500, 4000].map(val => (
-                                                    <option key={val} value={val}>${val}</option>
-                                                ))}
-                                            </select>
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#CBB26A]">
-                                                <ChevronRight size={16} className="rotate-90" />
-                                            </div>
-                                        </div>
-                                    </div>
+
                                 </div>
                             </div>
                         </div>
@@ -1998,7 +2052,13 @@ export const Board = () => {
             {/* TRADE PROPOSAL MODAL */}
             <AnimatePresence>
                 {isTradeModalOpen && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <motion.div
+                        key="trade-modal"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+                    >
                         <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-[#171324] border border-[#2A2438] w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
                             <div className="p-6 border-b border-[#2A2438] flex justify-between items-center bg-[#120F1D]">
                                 <h3 className="text-xl font-black text-white uppercase tracking-tighter">New Trade Proposal</h3>
@@ -2084,7 +2144,13 @@ export const Board = () => {
             {/* INCOMING TRADE OVERLAY */}
             <AnimatePresence>
                 {activeTrade && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[300] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md">
+                    <motion.div
+                        key="incoming-trade"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[300] bg-black/90 flex items-center justify-center p-4 backdrop-blur-md"
+                    >
                         <motion.div initial={{ scale: 0.8, y: 50 }} animate={{ scale: 1, y: 0 }} className="bg-[#171324] border-2 border-[#8A58FF] p-8 rounded-[2.5rem] w-full max-w-md shadow-[0_0_50px_rgba(138,88,255,0.3)] text-center">
                             <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Trade Received!</h3>
                             <p className="text-slate-400 text-sm mb-8">
@@ -2123,6 +2189,7 @@ export const Board = () => {
                     <AnimatePresence>
                         {isChatOpen && (
                             <motion.div
+                                key="chat-box"
                                 initial={{ opacity: 0, scale: 0.9, y: 20, transformOrigin: 'bottom left' }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
