@@ -126,6 +126,7 @@ interface GameState {
     setMonopolyRequiredToBuild: (required: boolean) => void;
     setRule: (rule: keyof GameState['rules'], value: boolean) => void;
     buildHouse: (playerId: string, spaceId: number) => void;
+    sellHouse: (playerId: string, spaceId: number) => void;
     postBail: (playerId: string) => void;
 }
 
@@ -832,7 +833,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     setRule: (rule, value) => set(state => ({
         rules: { ...state.rules, [rule]: value }
     })),
-    buildHouse: (playerId, spaceId) => {
+    buildHouse: (playerId: string, spaceId: number) => {
         set(state => {
             const space = BOARD_SPACES[spaceId];
             if (!space || space.type !== 'property' || !space.housePrice) return state;
@@ -880,6 +881,51 @@ export const useGameStore = create<GameState>((set, get) => ({
                     spaceId,
                     amount: space.housePrice,
                     message: `Built a house on ${space.name}`
+                });
+            }, 0);
+
+            return { players, boardState: newBoardState };
+        });
+    },
+    sellHouse: (playerId: string, spaceId: number) => {
+        set(state => {
+            const space = BOARD_SPACES[spaceId];
+            if (!space || space.type !== 'property' || !space.housePrice) return state;
+
+            const propertyState = state.boardState[spaceId];
+            if (!propertyState || propertyState.ownerId !== playerId || propertyState.houses <= 0) return state;
+
+            if (state.rules.evenBuild) {
+                const countryProps = BOARD_SPACES.filter(s => s.country === space.country);
+                const currentHouses = propertyState.houses;
+                const otherPropsInSet = countryProps.filter(s => s.id !== spaceId);
+
+                const canSell = otherPropsInSet.every(s => {
+                    const st = state.boardState[s.id];
+                    return st && st.houses <= currentHouses;
+                });
+
+                if (!canSell) return state;
+            }
+
+            const refund = Math.floor(space.housePrice / 2);
+            const players = [...state.players];
+            const pIdx = players.findIndex(p => p.id === playerId);
+            if (pIdx === -1) return state;
+
+            players[pIdx] = { ...players[pIdx], money: players[pIdx].money + refund };
+            const newBoardState = {
+                ...state.boardState,
+                [spaceId]: { ...propertyState, houses: propertyState.houses - 1 }
+            };
+
+            setTimeout(() => {
+                get().addLog({
+                    type: 'event',
+                    playerId,
+                    spaceId,
+                    amount: refund,
+                    message: `Sold a house on ${space.name} for $${refund}`
                 });
             }, 0);
 

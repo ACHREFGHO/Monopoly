@@ -4,7 +4,7 @@ import { useGameStore, BOARD_SPACES } from '../../store/useGameStore';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ContactShadows, RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
-import { Car, Zap, Droplets, Plane, Play, Lock, Siren, Send, ArrowRight, Sparkles, ChevronLeft, ChevronRight, Coins, Palmtree, Gavel, Home, DollarSign, Shuffle, RefreshCw, Volume2, VolumeX, Volume1 } from 'lucide-react';
+import { Car, Zap, Droplets, Plane, Play, Lock, Siren, Send, ArrowRight, Sparkles, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Coins, Palmtree, Gavel, Home, DollarSign, Shuffle, RefreshCw, Volume2, VolumeX, Volume1 } from 'lucide-react';
 import { useTexture } from '@react-three/drei';
 
 const getGridArea = (id: number) => {
@@ -516,7 +516,7 @@ const RuleToggle = ({ icon: Icon, title, description, value, onChange }: { icon:
 );
 
 export const Board = () => {
-    const { players, currentTurn, boardState, rollDice, endTurn, diceRoll, activeCard, activeTrade, gameLogs, tradeHistory, hasRolled, respondToTrade, proposeTrade, chatMessages, sendMessage, activeModalSpaceId, setActiveModalSpaceId, buyProperty, isMoving, dicePreference, setDicePreference, monopolyRequiredToBuild, setMonopolyRequiredToBuild, buildHouse, rules, setRule, postBail, soundVolume, setSoundVolume, activeAuction, placeBid, endAuction } = useGameStore();
+    const { players, currentTurn, boardState, rollDice, endTurn, diceRoll, activeCard, activeTrade, gameLogs, tradeHistory, hasRolled, respondToTrade, proposeTrade, chatMessages, sendMessage, activeModalSpaceId, setActiveModalSpaceId, buyProperty, isMoving, dicePreference, setDicePreference, monopolyRequiredToBuild, setMonopolyRequiredToBuild, buildHouse, sellHouse, rules, setRule, postBail, soundVolume, setSoundVolume, activeAuction, placeBid, endAuction } = useGameStore();
     const [isRolling, setIsRolling] = useState(false);
     const [hoveredSpaceId, setHoveredSpaceId] = useState<number | null>(null);
     const [monopolyCelebration, setMonopolyCelebration] = useState<{ country: string, ownerId: string } | null>(null);
@@ -881,60 +881,91 @@ export const Board = () => {
                                                 writingMode: (innerEdge === 'left' || innerEdge === 'right') ? 'vertical-rl' : 'horizontal-tb',
                                             }}
                                         >
-                                            {/* House/Hotel indicator on the color band */}
-                                            <AnimatePresence mode="popLayout">
-                                                {bState?.houses > 0 && (
-                                                    <div className="flex gap-0.5 pointer-events-none items-center justify-center w-full h-full relative">
-                                                        {bState.houses < 5 ? (
-                                                            Array.from({ length: bState.houses }).map((_, i) => (
+                                            {/* House/Hotel Indicator - Premium Glass Dock Design */}
+                                            {bState?.houses > 0 && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    className={`absolute z-20 pointer-events-none flex items-center justify-center
+                                                        ${(innerEdge === 'top' || innerEdge === 'bottom') ? 'inset-x-0 h-full px-1.5' : 'inset-y-0 w-full py-1.5'}
+                                                    `}
+                                                >
+                                                    <div
+                                                        className={`bg-[#0F172A]/40 backdrop-blur-md rounded-[10px] p-1.5 flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.6),inset_0_1px_2px_rgba(255,255,255,0.1)] border border-white/20
+                                                            ${(innerEdge === 'left' || innerEdge === 'right')
+                                                                ? (bState.houses === 4 ? 'grid grid-cols-2 gap-1' : 'flex flex-col gap-1')
+                                                                : (bState.houses === 4 ? 'grid grid-rows-2 grid-flow-col gap-1' : 'flex flex-row gap-1')
+                                                            }
+                                                        `}
+                                                    >
+                                                        <AnimatePresence mode="popLayout">
+                                                            {bState.houses < 5 ? (
+                                                                Array.from({ length: bState.houses }).map((_, i) => (
+                                                                    <motion.div
+                                                                        key={`house-${i}-${bState.houses}`}
+                                                                        initial={{ scale: 0, y: 5 }}
+                                                                        animate={{ scale: 1, y: 0 }}
+                                                                        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                                                                        className="text-[11px] sm:text-[13px] leading-none drop-shadow-[0_2px_5px_rgba(0,0,0,1)] relative"
+                                                                    >
+                                                                        🏠
+                                                                        {i === bState.houses - 1 && (
+                                                                            <motion.div
+                                                                                initial={{ scale: 0, opacity: 1 }}
+                                                                                animate={{ scale: 4.5, opacity: 0 }}
+                                                                                className="absolute inset-0 bg-white rounded-full blur-md z-[-1]"
+                                                                            />
+                                                                        )}
+                                                                    </motion.div>
+                                                                ))
+                                                            ) : (
                                                                 <motion.div
-                                                                    key={`house-${i}-${bState.houses}`}
-                                                                    initial={{ scale: 0, rotate: -45, opacity: 0 }}
-                                                                    animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                                                                    transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                                                                    className="text-[10px] sm:text-[11px] leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] relative"
+                                                                    key="hotel"
+                                                                    initial={{ scale: 0, rotate: 180 }}
+                                                                    animate={{
+                                                                        scale: [1, 1.15, 1],
+                                                                        rotate: 0,
+                                                                        filter: [
+                                                                            'drop-shadow(0 0 8px rgba(56,189,248,0.6))',
+                                                                            'drop-shadow(0 0 20px rgba(56,189,248,1))',
+                                                                            'drop-shadow(0 0 8px rgba(56,189,248,0.6))'
+                                                                        ]
+                                                                    }}
+                                                                    transition={{
+                                                                        scale: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+                                                                        filter: { duration: 2, repeat: Infinity, ease: 'easeInOut' }
+                                                                    }}
+                                                                    className="relative"
                                                                 >
-                                                                    🏠
-                                                                    {i === bState.houses - 1 && (
-                                                                        <motion.div
-                                                                            initial={{ scale: 0, opacity: 1 }}
-                                                                            animate={{ scale: 4, opacity: 0 }}
-                                                                            className="absolute inset-0 bg-white rounded-full blur-md z-[-1]"
-                                                                        />
-                                                                    )}
+                                                                    <div className="text-[18px] sm:text-[22px] leading-none">💎</div>
+                                                                    <motion.div
+                                                                        initial={{ scale: 0, opacity: 1 }}
+                                                                        animate={{ scale: 8, opacity: 0 }}
+                                                                        className="absolute inset-0 bg-blue-400 rounded-full blur-2xl z-[-1]"
+                                                                    />
                                                                 </motion.div>
-                                                            ))
-                                                        ) : (
-                                                            <motion.div
-                                                                key="hotel"
-                                                                initial={{ scale: 0, rotate: 180, opacity: 0 }}
-                                                                animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                                                                className="relative"
-                                                            >
-                                                                <div className="text-[12px] sm:text-[14px] leading-none drop-shadow-[0_0_12px_rgba(255,255,255,0.8)]">💎</div>
-                                                                <motion.div
-                                                                    initial={{ scale: 0, opacity: 1 }}
-                                                                    animate={{ scale: 6, opacity: 0 }}
-                                                                    className="absolute inset-0 bg-blue-400 rounded-full blur-xl z-[-1]"
-                                                                />
-                                                            </motion.div>
-                                                        )}
+                                                            )}
+                                                        </AnimatePresence>
                                                     </div>
-                                                )}
-                                            </AnimatePresence>
-                                            <span
-                                                className="font-black leading-none whitespace-nowrap select-none"
-                                                style={{
-                                                    fontSize: '9px',
-                                                    fontFamily: 'JetBrains Mono, monospace',
-                                                    color: '#fff',
-                                                    textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7)',
-                                                    transform: innerEdge === 'left' ? 'rotate(180deg)' : 'none',
-                                                    letterSpacing: '0.02em',
-                                                }}
-                                            >
-                                                {space.price}$
-                                            </span>
+                                                </motion.div>
+                                            )}
+
+                                            {/* Price Tag - Only visible if no houses to avoid overlap */}
+                                            {(!bState?.houses || bState.houses === 0) && (
+                                                <span
+                                                    className="font-black leading-none whitespace-nowrap select-none"
+                                                    style={{
+                                                        fontSize: '9px',
+                                                        fontFamily: 'JetBrains Mono, monospace',
+                                                        color: '#fff',
+                                                        textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7)',
+                                                        transform: innerEdge === 'left' ? 'rotate(180deg)' : 'none',
+                                                        letterSpacing: '0.02em',
+                                                    }}
+                                                >
+                                                    {space.price}$
+                                                </span>
+                                            )}
                                         </div>
                                     )}
 
@@ -1046,6 +1077,35 @@ export const Board = () => {
                                         className="absolute inset-0 rounded-[inherit] opacity-0 group-hover/space:opacity-100 pointer-events-none transition-opacity duration-300"
                                         style={{ background: 'radial-gradient(circle at center, rgba(203,178,106,0.08) 0%, transparent 70%)' }}
                                     />
+                                    {/* Quick Build Controls - Hover and Owned by current player */}
+                                    {space.type === 'property' && bState?.ownerId === players[currentTurn]?.id && hoveredSpaceId === id && !bState?.isMortgaged && (
+                                        (() => {
+                                            const countryProps = BOARD_SPACES.filter(s => s.country === space.country);
+                                            const hasMonopoly = countryProps.length > 0 && countryProps.every(s => boardState[s.id]?.ownerId === players[currentTurn]?.id);
+                                            return hasMonopoly;
+                                        })()
+                                    ) && (
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                className="absolute inset-0 z-[60] flex flex-col items-center justify-between p-0.5 bg-black/60 backdrop-blur-md rounded-[inherit] overflow-hidden"
+                                            >
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); buildHouse(players[currentTurn].id, id); }}
+                                                    className="w-full flex-1 flex items-center justify-center hover:bg-emerald-500/40 text-emerald-400 transition-all border-b border-white/10 group/btn"
+                                                    title="Build House"
+                                                >
+                                                    <ChevronUp size={28} className="drop-shadow-[0_0_8px_currentColor] group-hover/btn:scale-125 transition-transform" />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); sellHouse(players[currentTurn].id, id); }}
+                                                    className="w-full flex-1 flex items-center justify-center hover:bg-rose-500/40 text-rose-400 transition-all group/btn"
+                                                    title="Sell House"
+                                                >
+                                                    <ChevronDown size={28} className="drop-shadow-[0_0_8px_currentColor] group-hover/btn:scale-125 transition-transform" />
+                                                </button>
+                                            </motion.div>
+                                        )}
                                 </motion.div>
                             );
                         })}
@@ -1298,11 +1358,32 @@ export const Board = () => {
                             </AnimatePresence>
 
 
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="absolute flex flex-col items-center justify-center top-[10%] inset-x-0 mx-auto">
-                                <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-[0.1em] drop-shadow-[0_10px_30px_rgba(0,0,0,1)] bg-gradient-to-b from-white via-[#CBB26A] to-[#8E793E] bg-clip-text text-transparent flex items-center">
+                            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="absolute flex flex-col items-center justify-center top-[12%] inset-x-0 mx-auto pointer-events-none">
+                                <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-[0.1em] drop-shadow-[0_10px_30px_rgba(0,0,0,1)] bg-gradient-to-b from-white via-[#CBB26A] to-[#8E793E] bg-clip-text text-transparent flex items-center leading-none">
                                     MEDITERRANOPOLY
                                 </h1>
-                                <div className="w-48 h-[1px] bg-gradient-to-r from-transparent via-[#CBB26A]/40 to-transparent mt-4 shadow-[0_0_15px_rgba(203,178,106,0.5)]" />
+                                <div className="w-64 h-[2px] bg-gradient-to-r from-transparent via-[#CBB26A]/40 to-transparent mt-6 shadow-[0_0_20px_rgba(203,178,106,0.5)]" />
+
+                                {players.length === 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="mt-12 pointer-events-auto"
+                                    >
+                                        <button
+                                            onClick={() => useGameStore.getState().initGame(tempPlayers, startMoney)}
+                                            disabled={tempPlayers.length < 2}
+                                            className="px-12 py-5 rounded-2xl bg-[#CBB26A] hover:bg-[#DBC27A] text-[#0A0810] font-black text-xl tracking-[0.2em] shadow-[0_20px_50px_rgba(203,178,106,0.3)] hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all flex items-center gap-4 group relative overflow-hidden"
+                                        >
+                                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[120%] group-hover:animate-[shimmer_1.5s_infinite] skew-x-12" />
+                                            START EMPIRE
+                                            <Play size={24} fill="currentColor" />
+                                        </button>
+                                        {tempPlayers.length < 2 && (
+                                            <p className="text-[#CBB26A]/60 text-[10px] uppercase font-black tracking-widest mt-4 text-center animate-pulse">Add at least 2 players in the sidebar</p>
+                                        )}
+                                    </motion.div>
+                                )}
                             </motion.div>
                             {/* Animated Dice Engine in 3D */}
                             <div className="absolute inset-x-0 top-[28%] flex gap-4 md:gap-8 h-16 sm:h-24 md:h-32 items-center justify-center p-2">
@@ -1339,12 +1420,12 @@ export const Board = () => {
                             )}
 
                             <div className="absolute bottom-[8%] flex flex-col items-center gap-4 pointer-events-auto w-full px-12">
-                                {players.length > 0 && !boardState[players[currentTurn].position]?.ownerId && BOARD_SPACES[players[currentTurn].position].type === 'property' && hasRolled && !isMoving && (
+                                {players.length > 0 && !boardState[players[currentTurn].position]?.ownerId && ['property', 'station', 'utility'].includes(BOARD_SPACES[players[currentTurn].position].type) && hasRolled && !isMoving && (
                                     <button
                                         onClick={() => buyProperty(players[currentTurn].id, players[currentTurn].position)}
                                         className="w-full max-w-xs py-4 rounded-full font-black text-[10px] sm:text-xs tracking-[0.4em] bg-emerald-500 text-white hover:bg-emerald-400 hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] flex items-center justify-center gap-4 group border border-emerald-400/20"
                                     >
-                                        BUY PROPERTY <div className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-[10px] text-white">$</div>
+                                        ACQUIRE ASSET <div className="w-5 h-5 bg-white/20 rounded-lg flex items-center justify-center text-[10px] text-white">$</div>
                                     </button>
                                 )}
 
@@ -1468,11 +1549,12 @@ export const Board = () => {
                                                     </button>
                                                 )}
                                             </div>
-                                        ) : boardState[activeModalSpaceId].ownerId === players[currentTurn].id ? (
+                                        ) : boardState[activeModalSpaceId]?.ownerId === players[currentTurn].id ? (
                                             (() => {
                                                 const space = BOARD_SPACES[activeModalSpaceId];
                                                 const player = players[currentTurn];
                                                 const bState = boardState[activeModalSpaceId];
+                                                if (!bState) return null;
 
                                                 if (bState.isMortgaged) {
                                                     const unmortgageCost = Math.floor((space.price || 0) * 0.55);
@@ -1573,7 +1655,7 @@ export const Board = () => {
                                         ) : (
                                             <div className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-slate-500 text-center text-xs font-black uppercase tracking-widest mb-4 flex flex-col gap-1">
                                                 <div className="text-[10px] opacity-60">Owned by</div>
-                                                <div className="text-white font-bold" style={{ color: players.find(p => p.id === boardState[activeModalSpaceId].ownerId)?.color }}>{players.find(p => p.id === boardState[activeModalSpaceId].ownerId)?.name || 'Another Player'}</div>
+                                                <div className="text-white font-bold" style={{ color: players.find(p => p.id === boardState[activeModalSpaceId]?.ownerId)?.color }}>{players.find(p => p.id === boardState[activeModalSpaceId]?.ownerId)?.name || 'Another Player'}</div>
                                             </div>
                                         )}
                                         <div className="text-[9px] text-slate-500 font-bold uppercase tracking-tight italic">Increase your net worth and dominate the coast</div>
@@ -1846,10 +1928,8 @@ export const Board = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="p-4 sm:p-6 border-t border-[#2A2438] bg-[#120F1D]">
-                            <button onClick={() => useGameStore.getState().initGame(tempPlayers, startMoney)} disabled={tempPlayers.length < 2} className="w-full bg-[#CBB26A] hover:bg-[#B19859] text-[#0E0B16] py-4 rounded-xl font-black text-lg transition-transform active:scale-95 disabled:opacity-50 shadow-[0_0_20px_rgba(203,178,106,0.3)]">
-                                Start game →
-                            </button>
+                        <div className="p-4 sm:p-6 border-t border-[#2A2438] bg-[#120F1D] flex items-center justify-center">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">Setup your match rules above</span>
                         </div>
                     </div>
                 ) : (
