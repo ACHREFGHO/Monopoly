@@ -1358,11 +1358,26 @@ export const Board = () => {
                             </AnimatePresence>
 
 
-                            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="absolute flex flex-col items-center justify-center top-[12%] inset-x-0 mx-auto pointer-events-none">
-                                <h1 className="text-3xl sm:text-5xl md:text-7xl font-black tracking-[0.1em] drop-shadow-[0_10px_30px_rgba(0,0,0,1)] bg-gradient-to-b from-white via-[#CBB26A] to-[#8E793E] bg-clip-text text-transparent flex items-center leading-none">
-                                    MEDITERRANOPOLY
-                                </h1>
-                                <div className="w-64 h-[2px] bg-gradient-to-r from-transparent via-[#CBB26A]/40 to-transparent mt-6 shadow-[0_0_20px_rgba(203,178,106,0.5)]" />
+                            <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="absolute flex flex-col items-center justify-center top-[15%] inset-x-0 mx-auto pointer-events-none select-none z-10">
+                                <div className="flex items-center gap-2 mb-2.5 opacity-40">
+                                    <div className="w-5 h-[1px] bg-gradient-to-r from-transparent to-[#CBB26A]" />
+                                    <span className="text-[8px] font-black tracking-[0.4em] text-[#CBB26A] uppercase">Empire Edition</span>
+                                    <div className="w-5 h-[1px] bg-gradient-to-l from-transparent to-[#CBB26A]" />
+                                </div>
+
+                                <div className="relative group">
+                                    <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-[0.1em] drop-shadow-[0_15px_40px_rgba(0,0,0,1)] bg-gradient-to-b from-[#FFF5D9] via-[#CBB26A] to-[#8E793E] bg-clip-text text-transparent flex items-center leading-none italic">
+                                        MEDITERRANOPOLY
+                                    </h1>
+                                    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+                                        <div className="w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-[35deg] translate-x-[-150%] animate-[shimmer_6s_infinite]" />
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col items-center mt-5 gap-0.5">
+                                    <div className="w-64 h-[1px] bg-gradient-to-r from-transparent via-[#CBB26A]/40 to-transparent shadow-[0_0_10px_rgba(203,178,106,0.3)]" />
+                                    <div className="w-24 h-[1px] bg-gradient-to-r from-transparent via-[#CBB26A]/20 to-transparent" />
+                                </div>
 
                                 {players.length === 0 && (
                                     <motion.div
